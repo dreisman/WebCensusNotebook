@@ -38,10 +38,10 @@ class BlockListParser:
         if self.support_hash:
             return self._should_block_with_hash()
         blacklisted = False
-        for k in xrange(len(self.shortcut_sizes)):
+        for k in range(len(self.shortcut_sizes)):
             shortcut_size = self.shortcut_sizes[k]
             regex_map = self.all_shortcut_parser_maps[k]
-            for i in xrange(len(url) - shortcut_size + 1):
+            for i in range(len(url) - shortcut_size + 1):
                 cur_sub = url[i:i+shortcut_size]
                 if cur_sub in regex_map:
                     parser = regex_map[cur_sub]
@@ -70,10 +70,10 @@ class BlockListParser:
         if self.support_hash:
             return self._should_block_with_hash()
         blacklisted = False
-        for k in xrange(len(self.shortcut_sizes)):
+        for k in range(len(self.shortcut_sizes)):
             shortcut_size = self.shortcut_sizes[k]
             regex_map = self.all_shortcut_parser_maps[k]
-            for i in xrange(len(url) - shortcut_size + 1):
+            for i in range(len(url) - shortcut_size + 1):
                 cur_sub = url[i:i+shortcut_size]
                 cur_sub = cur_sub.lower()
                 if cur_sub in regex_map:
@@ -114,10 +114,10 @@ class BlockListParser:
     def should_block_with_items(self, url, options=None):
         blacklisting_items = []
         blacklisted = False
-        for k in xrange(len(self.shortcut_sizes)):
+        for k in range(len(self.shortcut_sizes)):
             shortcut_size = self.shortcut_sizes[k]
             regex_map = self.all_shortcut_parser_maps[k]
-            for i in xrange(len(url) - shortcut_size + 1):
+            for i in range(len(url) - shortcut_size + 1):
                 cur_sub = url[i:i+shortcut_size]
                 if cur_sub in regex_map:
                     parser = regex_map[cur_sub]
@@ -163,12 +163,12 @@ class BlockListParser:
 
     def _should_block_with_hash(self, url, options):
         blacklisted = False
-        for k in xrange(len(self.shortcut_sizes)):
+        for k in range(len(self.shortcut_sizes)):
             fast_hash = self.fast_hashes[k]
             shortcut_size = self.shortcut_sizes[k]
             regex_map = self.all_shortcut_parser_maps[k]
             prev_hash = -1
-            for i in xrange(len(url) - shortcut_size + 1):
+            for i in range(len(url) - shortcut_size + 1):
                 cur_hash = fast_hash.extend_hash(url, i, prev_hash)
                 if cur_hash in regex_map:
                     parser = regex_map[cur_hash]
@@ -239,7 +239,7 @@ class BlockListParser:
             min_count = -1
             for s in searches:
                 s = s.lower()
-                for i in xrange(len(s) - shortcut_size+1):
+                for i in range(len(s) - shortcut_size+1):
                     cur_s = s[i:i+shortcut_size]
                     if cur_s not in shortcut_url_map:
                         shortcut_url_map[cur_s] = [line]

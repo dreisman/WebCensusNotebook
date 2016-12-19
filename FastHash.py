@@ -7,7 +7,7 @@ class FastHash:
         self.R = 256
         self.Q = 179424673  # big prime number
         self.multipliers = []
-        for i in reversed(xrange(self.M)):
+        for i in reversed(range(self.M)):
             self.multipliers.append((self.R**i)%self.Q)
 
     def compute_hash(self, s, start_index = 0):
@@ -15,7 +15,7 @@ class FastHash:
             print("String length not equal to required length of %d" % self.M)
             return -1
         hash_value = 0
-        for i in xrange(self.M):
+        for i in range(self.M):
             hash_value = (hash_value + (ord(s[i+start_index])*self.multipliers[i])%self.Q)%self.Q
         return hash_value
 

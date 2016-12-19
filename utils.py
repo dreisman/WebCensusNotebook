@@ -2,7 +2,7 @@
 from BlockListParser import BlockListParser
 from ipaddress import ip_address
 from publicsuffix import PublicSuffixList, fetch
-from urlparse import urlparse
+from urllib.parse import urlparse
 
 # Execute on module load
 psl_file = fetch()
@@ -19,7 +19,7 @@ def get_host_plus_ps(url):
 
     hostname = urlparse(url).hostname
     try:
-        ip_address(unicode(hostname))
+        ip_address(hostname)
         return hostname
     except ValueError:
         return psl.get_public_suffix(hostname)
@@ -126,7 +126,7 @@ def get_top_level_type(content_type):
     """
     if ';' in content_type:
         content_type = content_type.split(';')[0]
-    for k,v in content_type_map.iteritems():
+    for k,v in content_type_map.items():
         if v(content_type.lower()):
             return k
     return None

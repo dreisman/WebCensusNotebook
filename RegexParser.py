@@ -269,19 +269,19 @@ class Parser:
 
     def print_rules(self):
         for rule in self.blacklist:
-            print "1:", rule.get_rule()
+            print("1:", rule.get_rule())
         for rule in self.whitelist:
-            print "2:",rule.get_rule()
+            print("2:",rule.get_rule())
         for domain in self.blacklist_require_domain:
             for rule in self.blacklist_require_domain[domain]:
-                print "3:", domain, ":", rule.get_rule()
+                print("3:", domain, ":", rule.get_rule())
         for domain in self.whitelist_require_domain:
             for rule in self.whitelist_require_domain[domain]:
-                print "4:", domain, ":", rule.get_rule()
+                print("4:", domain, ":", rule.get_rule())
         for rule in self.blacklist_with_options:
-            print "5:", rule.get_rule()
+            print("5:", rule.get_rule())
         for rule in self.whitelist_with_options:
-            print "6:", rule.get_rule()
+            print("6:", rule.get_rule())
 
 
 def _domain_variants(domain):

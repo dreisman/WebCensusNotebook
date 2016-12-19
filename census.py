@@ -53,7 +53,7 @@ def get_third_party_responses_by_domain(connection, top_url):
     try:
         top_ps = utils.get_host_plus_ps(top_url)
     except AttributeError:
-        print "Error while finding public suffix of %s" % top_url
+        print("Error while finding public suffix of %s" % top_url)
         return None
     
     cur.execute(tp_query, (top_url, top_ps))
@@ -144,14 +144,14 @@ def get_cookie_syncs_v2(connection, top_url, cookie_length=8):
         try:
             cookie_ps = utils.get_host_plus_ps(cookie_url)
         except AttributeError:
-            print "Error while finding public suffix of %s" % cookie_ps
+            print("Error while finding public suffix of %s" % cookie_ps)
             continue
 
         for url, referrer, location in rows:
             try:
                 url_ps = utils.get_host_plus_ps(url)
             except AttributeError:
-                print "Error while finding public suffix of %s" % url
+                print("Error while finding public suffix of %s" % url)
                 continue                
             if url_ps == cookie_ps:
                 continue
@@ -182,22 +182,22 @@ def get_cookie_syncs_on_domain(connection, top_url):
     cur = connection.cursor()
     cookie_cur = connection.cursor()
     
-    print redirect_query % top_url
+    print(redirect_query % top_url)
     cur.execute(redirect_query, (top_url,))
-    print "DONE WITH FIRST QUERY"
+    print("DONE WITH FIRST QUERY")
     cookie_syncs = defaultdict(set)
     for url, referrer, location in cur:
-        print "PROCESSING NEW LOCATION: " + location
+        print("PROCESSING NEW LOCATION: " + location)
         try:
             url_ps = utils.get_host_plus_ps(url)
         except AttributeError:
-            print "Error while finding public suffix of %s" % url
+            print("Error while finding public suffix of %s" % url)
             continue
 
         try:
             location_ps = utils.get_host_plus_ps(location)
         except AttributeError:
-            print "Error while finding public suffix of %s" % location
+            print("Error while finding public suffix of %s" % location)
             continue
 
         if location_ps == url_ps :
@@ -228,9 +228,9 @@ def get_cookie_syncs_on_domain(connection, top_url):
             synced_cookies.add((name, value))
             synced_cookie_name = name
             synced_cookie_value = value
-            print cookie_url
-            print name
-            print value
+            print(cookie_url)
+            print(name)
+            print(value)
         responses_query = "SELECT r.url, v.name, v.value FROM " \
                           "http_responses_view as r " \
                           "LEFT JOIN http_response_cookies_view as v " \
@@ -246,9 +246,9 @@ def get_cookie_syncs_on_domain(connection, top_url):
             synced_cookies.add((name, value))
             synced_cookie_name = name
             synced_cookie_value = value
-            print cookie_url
-            print name
-            print value
+            print(cookie_url)
+            print(name)
+            print(value)
                 
         if len(synced_cookies) > 0 :
             cookie_syncs[location].add((url, synced_cookie_name, synced_cookie_value))
@@ -256,7 +256,7 @@ def get_cookie_syncs_on_domain(connection, top_url):
 
 def get_urls_with(connection, top_url, symbol):
     """ Returns javascript urls which call these symbols on a given top_url"""
-    print "Grabbing scripts with %s" % symbol
+    print("Grabbing scripts with %s" % symbol)
     urls = set()
     
     cur = connection.cursor()

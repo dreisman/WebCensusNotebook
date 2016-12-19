@@ -12,7 +12,7 @@ class FastHash:
 
     def compute_hash(self, s, start_index = 0):
         if (len(s) - start_index) < self.M:
-            print "String length not equal to required length of %d" % self.M
+            print("String length not equal to required length of %d" % self.M)
             return -1
         hash_value = 0
         for i in xrange(self.M):
@@ -23,7 +23,7 @@ class FastHash:
         if start_index == 0:
             return self.compute_hash(s, start_index)
         if (len(s) - start_index) < self.M:
-            print "String length not equal to required length of %d" % self.M
+            print("String length not equal to required length of %d" % self.M)
             return -1
         hash_value = ((prev_hash - ord(s[start_index-1])*self.multipliers[0])*self.R + ord(s[start_index + self.M - 1]))%self.Q
         return hash_value

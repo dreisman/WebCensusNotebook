@@ -54,7 +54,7 @@ class Census:
             if url_domain == tp_domain:
                 sites_with_tp[top_url].append(url)
 
-        return sites_with_tp     
+        return dict(sites_with_tp)
 
     def get_third_party_responses_by_domain(self, top_url):
         """Return a dictionary containing third party data loaded on given top_url."""
@@ -105,7 +105,7 @@ class Census:
             url_data['is_tracker'] = is_tracker
             response_data[url] = url_data
 
-        return response_data
+        return dict(response_data)
 
     def get_cookie_syncs_v2(self, top_url, cookie_length=8):
         """Get all 'cookie sync' events on a given top_url.
@@ -138,7 +138,6 @@ class Census:
             return None
 
         cookie_syncs = defaultdict(set)
-        one_sided_cookie_syncs = defaultdict
         i = 0
         check_responses_query = "SELECT url, referrer, location FROM http_responses_view " \
                                 "WHERE top_url = %s " 
@@ -183,7 +182,7 @@ class Census:
                     continue
                 cookie_syncs[receiving_url].add((sending_url, value))
 
-        return cookie_syncs
+        return dict(cookie_syncs)
 
 
     def get_cookie_syncs_on_domain(self, top_url):
@@ -266,7 +265,7 @@ class Census:
 
             if len(synced_cookies) > 0 :
                 cookie_syncs[location].add((url, synced_cookie_name, synced_cookie_value))
-        return cookie_syncs
+        return dict(cookie_syncs)
 
     def get_urls_with(self, top_url, symbol):
         """ Returns javascript urls which call these symbols on a given top_url"""

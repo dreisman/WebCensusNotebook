@@ -56,7 +56,7 @@ class Census:
 
         return dict(sites_with_tp)
 
-    def get_third_party_responses_by_domain(self, top_url):
+    def get_all_third_party_responses_by_site(self, top_url):
         """Return a dictionary containing third party data loaded on given top_url."""
         tp_query = "SELECT r.url, h.value FROM http_responses_view AS r " \
                    "LEFT JOIN http_response_headers_view as h ON h.response_id = r.id " \
@@ -84,7 +84,7 @@ class Census:
             url_ps = utils.get_host_plus_ps(url)
             if url_ps == top_ps:
                 continue
-            url_data['url_ps'] = url_ps
+            url_data['url_domain'] = url_ps
 
             is_js = utils.is_js(url, content_type)
             is_img = utils.is_img(url, content_type)
@@ -107,6 +107,15 @@ class Census:
 
         return dict(response_data)
 
+    def get_all_third_party_trackers_by_site(self, top_url, full_url=False):
+        """Return a list of third party resources found on a top_url that are trackers.
+        """
+        results = self.get_all_third_party_responses_by_site(top_url)
+        third_party_track_scripts = [x for x in results if 
+                                        results[x]['is_tracker']]
+        return third_party_track_scripts
+        
+    
     def get_cookie_syncs_v2(self, top_url, cookie_length=8):
         """Get all 'cookie sync' events on a given top_url.
 

@@ -109,9 +109,8 @@ class Census:
         return dict(response_data)
 
 
-    def get_third_party_resources_for_multiple_sites(self, list_of_top_urls):
-        """Return a dictionary containing third party data loaded on multiple sites,
-        and write results to disk.
+    def get_third_party_resources_for_multiple_sites(self, sites):
+        """Get third party data loaded on multiple sites and write results to disk.
         """
 
         tracker_js_by_top = defaultdict(set)
@@ -121,7 +120,7 @@ class Census:
 
         tracker_other_by_top = defaultdict(set)
         non_tracker_other_by_top = defaultdict(set)
-        for site in list_of_top_urls:
+        for site in sites:
             tp_data = self.get_all_third_party_responses_by_site(site)
             for url in tp_data:
                 url_ps = tp_data[url]['url_domain']
@@ -190,8 +189,10 @@ class Census:
                                         results[x]['is_tracker']]
         return third_party_track_scripts
     
-    def get_cookie_syncs_v2(self, top_url, cookie_length=8):
+    def get_cookie_syncs_by_site(self, top_url, cookie_length=8):
         """Get all 'cookie sync' events on a given top_url.
+
+        Cookies must be at least cookie_length characters long to be considered.
 
         Returns a dict mapping receiving urls to the domain sending the cookie, 
         and the value of the cookie being shared
@@ -266,9 +267,45 @@ class Census:
                 cookie_syncs[receiving_url].add((sending_url, value))
 
         return dict(cookie_syncs)
+    
+    def get_cookie_syncs_for_multiple_sites(self, sites, cookie_length=8):
+        """Get cookie syncing data for multiple sites, and write results to disk.
+        
+        Cookies must be at least cookie_length characters long to be considered.
+        """
+        cookie_sync_data = defaultdict(defaultdict)
+        for site in sites:
+            cookie_sync_data[site] = self.get_cookie_syncs_by_site(site, cookie_length=cookie_length)
+            
+        # Write complete output as csv
+        with open('full_cookie_syncs.csv', 'w') as f:
+            writer = csv.writer(f)
+            writer.writerow(['site', 'sending_domain', 'receiving_url', 'cookie_value'])
+            for site in cookie_sync_data:
+                for receiving_url in cookie_sync_data[site]:
+                    for sending_url, cookie_value in cookie_sync_data[site][receiving_url]:
+                        writer.writerow([site, sending_url, receiving_url, cookie_value])
 
+        # Write partial output as CSV, only identifying sending domain and receiving domain
+        # (rather than the full receiving URL)
 
-    def get_cookie_syncs_on_domain(self, top_url):
+        cooks_just_domains = defaultdict(defaultdict)
+        for site in cookie_sync_data:
+            cooks_just_domains[site] = defaultdict(set)
+            for receiving_url in cookie_sync_data[site]:
+                for sending_domain, value in cookie_sync_data[site][receiving_url]:
+                    cooks_just_domains[site][utils.get_domain(receiving_url)].add(sending_domain)
+        with open('condensed_cookie_syncs.csv', 'w') as f:
+            writer = csv.writer(f)
+            writer.writerow(['site', 'sending_domain', 'receiving_domain'])
+            for site in cooks_just_domains:
+                for receiving_domain in cooks_just_domains[site]:
+                    if len(cooks_just_domains[site][receiving_domain]) > 1 and 'NOT_FOUND' in cooks_just_domains[site][receiving_domain]:
+                        cooks_just_domains[site][receiving_domain].discard('NOT_FOUND')
+                    for sending_domain in cooks_just_domains[site][receiving_domain]:
+                        writer.writerow([site, sending_domain, receiving_domain])
+
+    def _old_get_cookie_syncs_on_domain(self, top_url):
         """DEPRECATED: old method to find cookie syncs."""
         redirect_query = "SELECT url, referrer, location FROM http_responses_view " \
                          "WHERE location IS NOT NULL AND location != '' AND " \

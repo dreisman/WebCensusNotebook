@@ -11,7 +11,7 @@ psl = PublicSuffixList(psl_file)
 class CensusUtilsException(Exception):
     pass
 
-def get_host_plus_ps(url):
+def get_domain(url):
     """Strip the URL down to just a hostname+publicsuffix.
 
     If the provided url contains an IP address, the IP address is returned.
@@ -34,8 +34,8 @@ def is_tracker(url, is_js=False, is_img=False,
 
     options = dict()
     if first_party:
-        fp_domain = get_host_plus_ps(first_party)
-        url_domain = get_host_plus_ps(url)
+        fp_domain = get_domain(first_party)
+        url_domain = get_domain(url)
 
         if url_domain != fp_domain:
             options['third-party'] = True
@@ -57,7 +57,7 @@ def get_trackers(url_list, first_party, blocklist_parser=None, blocklist="easyli
     filtered_domains = set()
     for url in url_list:
         if is_tracker(url, first_party, blocklist_parser):
-            filtered_domains.add(get_host_plus_ps(url))
+            filtered_domains.add(get_domain(url))
 
     return filtered_domains
 

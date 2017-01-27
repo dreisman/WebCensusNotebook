@@ -1,6 +1,7 @@
 from BlockListParser import BlockListParser
 from collections import defaultdict
 
+import csv
 import os
 import re
 import psycopg2
@@ -34,7 +35,7 @@ class Census:
 
         return False
 
-    def get_top_urls_with_third_party_domain(self, tp_domain):
+    def get_sites_with_third_party_domain(self, tp_domain):
         """Return a dictionary mapping top_url -> list(tp_urls_from_tp_domain)"""
         tp_query = "SELECT top_url, url FROM http_responses_view " \
                    "WHERE url LIKE '%%' || %s || '%%'"
@@ -49,7 +50,7 @@ class Census:
                 continue
 
             # Check to make sure URL properly matches domain, and is not a false positive
-            url_domain = utils.get_host_plus_ps(url)
+            url_domain = utils.get_domain(url)
 
             if url_domain == tp_domain:
                 sites_with_tp[top_url].append(url)
@@ -65,7 +66,7 @@ class Census:
         cur = self.connection.cursor()
         cur.itersize = 100000
         try:
-            top_ps = utils.get_host_plus_ps(top_url)
+            top_ps = utils.get_domain(top_url)
         except AttributeError:
             print("Error while finding public suffix of %s" % top_url)
             return None
@@ -81,7 +82,7 @@ class Census:
 
             url_data = dict()
 
-            url_ps = utils.get_host_plus_ps(url)
+            url_ps = utils.get_domain(url)
             if url_ps == top_ps:
                 continue
             url_data['url_domain'] = url_ps
@@ -107,14 +108,87 @@ class Census:
 
         return dict(response_data)
 
-    def get_all_third_party_trackers_by_site(self, top_url, full_url=False):
+
+    def get_third_party_resources_for_multiple_sites(self, list_of_top_urls):
+        """Return a dictionary containing third party data loaded on multiple sites,
+        and write results to disk.
+        """
+
+        tracker_js_by_top = defaultdict(set)
+        tracker_img_by_top = defaultdict(set)
+        non_tracker_js_by_top = defaultdict(set)
+        non_tracker_img_by_top = defaultdict(set)
+
+        tracker_other_by_top = defaultdict(set)
+        non_tracker_other_by_top = defaultdict(set)
+        for site in list_of_top_urls:
+            tp_data = self.get_all_third_party_responses_by_site(site)
+            for url in tp_data:
+                url_ps = tp_data[url]['url_domain']
+                is_tracker = tp_data[url]['is_tracker']
+                if is_tracker:
+                    if tp_data[url]['is_js']:
+                        tracker_js_by_top[site].add(url_ps)
+                    elif tp_data[url]['is_img']:
+                        tracker_img_by_top[site].add(url_ps)
+                    else:
+                        tracker_other_by_top[site].add(url_ps)
+                else:
+                    if tp_data[url]['is_js']:
+                        non_tracker_js_by_top[site].add(url_ps)
+                    elif tp_data[url]['is_img']:
+                        non_tracker_img_by_top[site].add(url_ps)           
+                    else:
+                        non_tracker_other_by_top[site].add(url_ps)
+        
+        # Save data to CSV's
+        with open('tracker_js_by_site.csv', 'w') as f:
+            writer = csv.writer(f)
+            writer.writerow(['site', 'tp_domain'])
+            for top in tracker_js_by_top:
+                for tp in tracker_js_by_top[top]:
+                    writer.writerow([top, tp])
+        with open('non_tracker_js_by_site.csv', 'w') as f:
+            writer = csv.writer(f)
+            writer.writerow(['site', 'tp_domain'])
+            for top in non_tracker_js_by_top:
+                for tp in non_tracker_js_by_top[top]:
+                    writer.writerow([top, tp])
+        with open('tracker_img_by_site.csv', 'w') as f:
+            writer = csv.writer(f)
+            writer.writerow(['site', 'tp_domain'])
+            for top in tracker_img_by_top:
+                for tp in tracker_img_by_top[top]:
+                    writer.writerow([top, tp])
+        with open('non_tracker_img_by_site.csv', 'w') as f:
+            writer = csv.writer(f)
+            writer.writerow(['site', 'tp_domain'])
+            for top in non_tracker_img_by_top:
+                for tp in non_tracker_img_by_top[top]:
+                    writer.writerow([top, tp])
+        with open('tracker_other_by_site.csv', 'w') as f:
+            writer = csv.writer(f)
+            writer.writerow(['site', 'tp_domain'])
+            for top in tracker_other_by_top:
+                for tp in tracker_other_by_top[top]:
+                    writer.writerow([top, tp])
+        with open('non_tracker_other_by_site.csv', 'w') as f:
+            writer = csv.writer(f)
+            writer.writerow(['site', 'tp_domain'])
+            for top in non_tracker_other_by_top:
+                for tp in non_tracker_other_by_top[top]:
+                    writer.writerow([top, tp])
+                    
+        print("Query results written to filesystem. Check file browser at https://webcensus.openwpm.com to see results.")
+        return
+    
+    def get_all_third_party_trackers_by_site(self, top_url):
         """Return a list of third party resources found on a top_url that are trackers.
         """
         results = self.get_all_third_party_responses_by_site(top_url)
         third_party_track_scripts = [x for x in results if 
                                         results[x]['is_tracker']]
         return third_party_track_scripts
-        
     
     def get_cookie_syncs_v2(self, top_url, cookie_length=8):
         """Get all 'cookie sync' events on a given top_url.
@@ -164,14 +238,14 @@ class Census:
             if len(value) < cookie_length:
                 continue
             try:
-                cookie_ps = utils.get_host_plus_ps(cookie_url)
+                cookie_ps = utils.get_domain(cookie_url)
             except AttributeError:
                 print("Error while finding public suffix of %s" % cookie_ps)
                 continue
 
             for url, referrer, location in rows:
                 try:
-                    url_ps = utils.get_host_plus_ps(url)
+                    url_ps = utils.get_domain(url)
                 except AttributeError:
                     print("Error while finding public suffix of %s" % url)
                     continue                
@@ -180,7 +254,7 @@ class Census:
 
                 if referrer and (value in referrer):
                     receiving_url = url
-                    sending_url = utils.get_host_plus_ps(referrer)
+                    sending_url = utils.get_domain(referrer)
                 elif location and (value in location):
                     receiving_url = location
                     sending_url = url_ps
@@ -211,13 +285,13 @@ class Census:
         for url, referrer, location in cur:
             print("PROCESSING NEW LOCATION: " + location)
             try:
-                url_ps = utils.get_host_plus_ps(url)
+                url_ps = utils.get_domain(url)
             except AttributeError:
                 print("Error while finding public suffix of %s" % url)
                 continue
 
             try:
-                location_ps = utils.get_host_plus_ps(location)
+                location_ps = utils.get_domain(location)
             except AttributeError:
                 print("Error while finding public suffix of %s" % location)
                 continue

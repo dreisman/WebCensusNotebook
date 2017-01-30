@@ -109,7 +109,7 @@ class Census:
         return dict(response_data)
 
 
-    def get_third_party_resources_for_multiple_sites(self, sites):
+    def get_third_party_resources_for_multiple_sites(self, sites, filepath=''):
         """Get third party data loaded on multiple sites and write results to disk.
         """
 
@@ -141,44 +141,44 @@ class Census:
                         non_tracker_other_by_top[site].add(url_ps)
         
         # Save data to CSV's
-        with open('tracker_js_by_site.csv', 'w') as f:
+        with open(os.path.join(filepath, 'tracker_js_by_site.csv'), 'w') as f:
             writer = csv.writer(f)
             writer.writerow(['site', 'tp_domain'])
             for top in tracker_js_by_top:
                 for tp in tracker_js_by_top[top]:
                     writer.writerow([top, tp])
-        with open('non_tracker_js_by_site.csv', 'w') as f:
+        with open(os.path.join(filepath, 'non_tracker_js_by_site.csv'), 'w') as f:
             writer = csv.writer(f)
             writer.writerow(['site', 'tp_domain'])
             for top in non_tracker_js_by_top:
                 for tp in non_tracker_js_by_top[top]:
                     writer.writerow([top, tp])
-        with open('tracker_img_by_site.csv', 'w') as f:
+        with open(os.path.join(filepath, 'tracker_img_by_site.csv'), 'w') as f:
             writer = csv.writer(f)
             writer.writerow(['site', 'tp_domain'])
             for top in tracker_img_by_top:
                 for tp in tracker_img_by_top[top]:
                     writer.writerow([top, tp])
-        with open('non_tracker_img_by_site.csv', 'w') as f:
+        with open(os.path.join(filepath, 'non_tracker_img_by_site.csv'), 'w') as f:
             writer = csv.writer(f)
             writer.writerow(['site', 'tp_domain'])
             for top in non_tracker_img_by_top:
                 for tp in non_tracker_img_by_top[top]:
                     writer.writerow([top, tp])
-        with open('tracker_other_by_site.csv', 'w') as f:
+        with open(os.path.join(filepath, 'tracker_other_by_site.csv'), 'w') as f:
             writer = csv.writer(f)
             writer.writerow(['site', 'tp_domain'])
             for top in tracker_other_by_top:
                 for tp in tracker_other_by_top[top]:
                     writer.writerow([top, tp])
-        with open('non_tracker_other_by_site.csv', 'w') as f:
+        with open(os.path.join(filepath, 'non_tracker_other_by_site.csv'), 'w') as f:
             writer = csv.writer(f)
             writer.writerow(['site', 'tp_domain'])
             for top in non_tracker_other_by_top:
                 for tp in non_tracker_other_by_top[top]:
                     writer.writerow([top, tp])
                     
-        print("Query results written to filesystem. Check file browser at https://webcensus.openwpm.com to see results.")
+        print("Query results written to filesystem.")
         return
     
     def get_all_third_party_trackers_by_site(self, top_url):
@@ -268,7 +268,7 @@ class Census:
 
         return dict(cookie_syncs)
     
-    def get_cookie_syncs_for_multiple_sites(self, sites, cookie_length=8):
+    def get_cookie_syncs_for_multiple_sites(self, sites, cookie_length=8, filepath=''):
         """Get cookie syncing data for multiple sites, and write results to disk.
         
         Cookies must be at least cookie_length characters long to be considered.
@@ -278,7 +278,7 @@ class Census:
             cookie_sync_data[site] = self.get_cookie_syncs_by_site(site, cookie_length=cookie_length)
             
         # Write complete output as csv
-        with open('full_cookie_syncs.csv', 'w') as f:
+        with open(os.path.join(filepath, 'full_cookie_syncs.csv'), 'w') as f:
             writer = csv.writer(f)
             writer.writerow(['site', 'sending_domain', 'receiving_url', 'cookie_value'])
             for site in cookie_sync_data:
@@ -295,7 +295,7 @@ class Census:
             for receiving_url in cookie_sync_data[site]:
                 for sending_domain, value in cookie_sync_data[site][receiving_url]:
                     cooks_just_domains[site][utils.get_domain(receiving_url)].add(sending_domain)
-        with open('condensed_cookie_syncs.csv', 'w') as f:
+        with open(os.path.join(filepath, 'condensed_cookie_syncs.csv'), 'w') as f:
             writer = csv.writer(f)
             writer.writerow(['site', 'sending_domain', 'receiving_domain'])
             for site in cooks_just_domains:

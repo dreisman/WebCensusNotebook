@@ -183,9 +183,16 @@ class Census:
         """Return a list of third party resources found on a top_url that are trackers.
         """
         results = self.get_all_third_party_responses_by_site(top_url)
-        third_party_track_scripts = [x for x in results if 
+        third_party_trackers = [x for x in results if 
                                         results[x]['is_tracker']]
-        return third_party_track_scripts
+        return third_party_trackers
+    
+    def get_all_third_party_scripts_by_site(self, top_url):
+        """Return a list of third party resources on a top_url that are scripts."""
+        results = self.get_all_third_party_responses_by_site(top_url)
+        third_party_scripts = [x for x in results if results[x]['is_js']]
+        
+        return third_party_scripts
     
     def get_cookie_syncs_by_site(self, top_url, cookie_length=8):
         """Get all 'cookie sync' events on a given top_url.

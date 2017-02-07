@@ -7,6 +7,8 @@ from urllib.parse import urlparse
 # Execute on module load
 psl_file = fetch()
 psl = PublicSuffixList(psl_file)
+el_parser = BlockListParser('easylist.txt')
+ep_parser = BlockListParser('easyprivacy.txt')
 
 class CensusUtilsException(Exception):
     pass
@@ -25,13 +27,17 @@ def get_domain(url):
         return psl.get_public_suffix(hostname)
     
 def is_tracker(url, is_js=False, is_img=False, 
-               first_party=None, blocklist_parser=None, blocklist='easylist.txt'):
+               first_party=None, blocklist='easylist'):
     """Return a bool determining if a given url is a tracker in the given
     first party context (if first_party provided)."""
-
-    if not blocklist_parser:
-        blocklist_parser = BlockListParser(blocklist)
-
+    
+    if blocklist == 'easylist':
+        parser = el_parser
+    elif blocklist == 'easyprivacy':
+        parser = ep_parser
+    else:
+        raise CensusUtilsException("You must provide a supported blocklist: easylist, easyprivacy")
+        
     options = dict()
     if first_party:
         fp_domain = get_domain(first_party)
@@ -43,7 +49,7 @@ def is_tracker(url, is_js=False, is_img=False,
     options['image'] = is_img
     options['script'] = is_js
 
-    return blocklist_parser.should_block(url, options)
+    return parser.should_block(url, options)
 
 def get_trackers(url_list, first_party, blocklist_parser=None, blocklist="easylist.txt"):
     """Identify domains that are identified as trackers from list of URLs.

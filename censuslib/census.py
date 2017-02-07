@@ -20,7 +20,7 @@ class Census:
         host = 'princeton-web-census-machine-1.cp85stjatkdd.us-east-1.rds.amazonaws.com' 
         db_details = 'dbname={0} user={1} password={2} host={3}'.format(census_name, user, password, host)
         self.connection = psycopg2.connect(db_details)
-
+        
     def check_top_url(self, top_url):
         """Return True if a top_url is present in the census."""
         check_query = "SELECT exists (SELECT * FROM site_visits WHERE top_url = %s LIMIT 1)"
@@ -73,8 +73,6 @@ class Census:
 
         cur.execute(tp_query, (top_url, top_ps))
 
-        el_parser = BlockListParser('easylist.txt')
-        ep_parser = BlockListParser('easyprivacy.txt')
         response_data = defaultdict(dict)
         for url, content_type in cur:
             if utils.should_ignore(url):
@@ -93,12 +91,12 @@ class Census:
                                              is_js=is_js,
                                              is_img=is_img, 
                                              first_party=top_url, 
-                                             blocklist_parser=el_parser)
+                                             blocklist='easylist')
             is_ep_tracker = utils.is_tracker(url, 
                                              is_js=is_js,
                                              is_img=is_img, 
                                              first_party=top_url, 
-                                             blocklist_parser=ep_parser)
+                                             blocklist='easyprivacy')
             is_tracker = is_el_tracker or is_ep_tracker
 
             url_data['is_js'] = is_js

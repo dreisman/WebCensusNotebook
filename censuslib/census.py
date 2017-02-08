@@ -23,6 +23,29 @@ class Census:
         db_details = 'dbname={0} user={1} password={2} host={3}'.format(census_name, user, password, host)
         self.connection = psycopg2.connect(db_details)
         
+    def _filter_site_list(self, sites, raise_exception=False):
+        """Return a list of sites, filtered to remove sites that are not present in the dataset.
+        
+        If raise_exception, raise an exception if any of the given sites were not found in dataset.
+        Else, just print the list of sites excluded.
+        """
+        present_sites = []
+        missing_sites = []
+        for site in sites:
+            if self.check_top_url(site):
+                present_sites.append(site)
+            else:
+                missing_sites.append(site)
+        
+        if len(missing_sites) > 0:
+            print('Following sites not found in dataset: ' + str(missing_sites))
+            print('NOTE: all sites in census are indexed by http://[domain_name].[tld]')
+        
+            if raise_exception:
+                raise CensusException("Sites were included that are not present in the dataset.")
+        
+        return present_sites
+        
     def check_top_url(self, top_url):
         """Return True if a top_url is present in the census."""
         check_query = "SELECT exists (SELECT * FROM site_visits WHERE top_url = %s LIMIT 1)"
@@ -124,6 +147,7 @@ class Census:
         
         Limit graphed output to top_n most frequent third parties
         """
+        sites = self._filter_site_list(sites)
         orgs_count = Counter()
         for site in sites:
             orgs = self.get_third_party_organizations_by_site(site)
@@ -136,7 +160,7 @@ class Census:
     def get_third_party_resources_for_multiple_sites(self, sites, filepath=''):
         """Get third party data loaded on multiple sites and write results to disk.
         """
-
+        sites = self._filter_site_list(sites)
         tracker_js_by_top = defaultdict(set)
         tracker_img_by_top = defaultdict(set)
         non_tracker_js_by_top = defaultdict(set)
@@ -304,6 +328,7 @@ class Census:
         
         Cookies must be at least cookie_length characters long to be considered.
         """
+        sites = self._filter_site_list(sites)
         cookie_sync_data = defaultdict(defaultdict)
         for site in sites:
             cookie_sync_data[site] = self.get_cookie_syncs_by_site(site, cookie_length=cookie_length)

@@ -4,11 +4,16 @@ from ipaddress import ip_address
 from publicsuffix import PublicSuffixList, fetch
 from urllib.parse import urlparse
 
+import json
+
 # Execute on module load
 psl_file = fetch()
 psl = PublicSuffixList(psl_file)
 el_parser = BlockListParser('easylist.txt')
 ep_parser = BlockListParser('easyprivacy.txt')
+
+with open('org_domains.json', 'r') as f:
+    org_domains = json.load(f)
 
 class CensusUtilsException(Exception):
     pass
@@ -66,6 +71,25 @@ def get_trackers(url_list, first_party, blocklist_parser=None, blocklist="easyli
             filtered_domains.add(get_domain(url))
 
     return filtered_domains
+
+def get_org(url):
+    """If possible, find the name of the organization owning this particular URL/domain.
+    
+    If no organization is found, return none.
+    """
+    url_domain = get_domain(url)
+    organization = None
+
+    for org in org_domains:
+        try:
+            if url_domain in org[u'domains']:
+                organization = org[u'organization']
+        except KeyError:
+            continue
+     
+    return organization
+        
+    
 
 def should_ignore(url):
     """

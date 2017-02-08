@@ -1,7 +1,9 @@
 from BlockListParser import BlockListParser
-from collections import defaultdict
+from collections import Counter, defaultdict
 
 import csv
+import matplotlib.pyplot as plt
+import numpy as np
 import os
 import re
 import psycopg2
@@ -99,14 +101,38 @@ class Census:
                                              blocklist='easyprivacy')
             is_tracker = is_el_tracker or is_ep_tracker
 
+            organization = utils.get_org(url)
+            
             url_data['is_js'] = is_js
             url_data['is_img'] = is_img
             url_data['is_tracker'] = is_tracker
+            url_data['organization_name'] = organization
+            
             response_data[url] = url_data
 
         return dict(response_data)
 
-
+    def get_third_party_organizations_by_site(self, top_url):
+        """Get a list of third-party organizations found on a particular site (top_url)."""
+        results = self.get_all_third_party_responses_by_site(top_url)
+        third_party_orgs = [results[x]['organization_name'] for x in results
+                            if results[x]['organization_name']]
+        return third_party_orgs
+    
+    def graph_third_party_organizations_found_on_sites(self, sites, top_n=10):
+        """Graph the frequency of particular third-party organizations on a given list of sites.
+        
+        Limit graphed output to top_n most frequent third parties
+        """
+        orgs_count = Counter()
+        for site in sites:
+            orgs = self.get_third_party_organizations_by_site(site)
+            orgs_count.update(orgs)
+        plt.figure(figsize=(30,10))
+        plt.bar(np.arange(top_n), [x[1] for x in orgs_count.most_common(top_n)])
+        plt.xticks(np.arange(top_n), [x[0] for x in orgs_count.most_common(top_n)])
+        plt.tick_params(axis='both', which='major', labelsize=22)
+            
     def get_third_party_resources_for_multiple_sites(self, sites, filepath=''):
         """Get third party data loaded on multiple sites and write results to disk.
         """

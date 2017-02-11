@@ -77,9 +77,13 @@ def get_org(url):
     
     If no organization is found, return none.
     """
-    url_domain = get_domain(url)
-    organization = None
-
+    if url[:4] == 'http':
+        url_domain = get_domain(url)
+        organization = None
+    else:
+        url_domain = url
+        organization = None
+        
     for org in org_domains:
         try:
             if url_domain in org[u'domains']:

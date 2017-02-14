@@ -48,6 +48,7 @@ class Census:
         
     def check_top_url(self, top_url):
         """Return True if a top_url is present in the census."""
+        top_url = 'http://' + top_url
         check_query = "SELECT exists (SELECT * FROM site_visits WHERE top_url = %s LIMIT 1)"
 
         cur = self.connection.cursor()
@@ -84,6 +85,7 @@ class Census:
 
     def get_all_third_party_responses_by_site(self, top_url):
         """Return a dictionary containing third party data loaded on given top_url."""
+        top_url = 'http://' + top_url
         tp_query = "SELECT r.url, h.value FROM http_responses_view AS r " \
                    "LEFT JOIN http_response_headers_view as h ON h.response_id = r.id " \
                    " WHERE r.top_url LIKE %s AND " \
@@ -256,7 +258,7 @@ class Census:
         all cookies that are shared from one domain to a URL not in that domain
         that are >= cookie_length.
         """
-
+        top_url = 'http://' + top_url
         # Select all url, name, value from response_cookies_view by top_url
         query = "SELECT DISTINCT res.url, v1.name, v1.value FROM " \
                 "http_responses_view as res " \
@@ -445,6 +447,7 @@ class Census:
 
     def get_urls_with(self, top_url, symbol):
         """ Returns javascript urls which call these symbols on a given top_url"""
+        top_url = 'http://' + top_url
         print("Grabbing scripts with %s" % symbol)
         urls = set()
 

@@ -45,7 +45,20 @@ class Census:
                 raise CensusException("Sites were included that are not present in the dataset.")
         
         return present_sites
+    
+    def get_sites_in_census(self):
+        """Return a list of top_urls in census."""
+        query = "SELECT top_url FROM site_visits"
         
+        cur = self.connection.cursor()
+        cur.itersize = 100000
+        cur.execute(query)
+        
+        sites = []
+        for top_url, in cur:
+            sites.append(top_url[7:])
+        return sites
+    
     def check_top_url(self, top_url):
         """Return True if a top_url is present in the census."""
         top_url = 'http://' + top_url
@@ -63,9 +76,9 @@ class Census:
 
     def get_sites_with_third_party_domain(self, tp_domain):
         """Return a dictionary mapping top_url -> list(tp_urls_from_tp_domain)"""
-        tp_query = "SELECT top_url, url FROM http_responses_view " \
-                   "WHERE url LIKE '%%' || %s || '%%'"
-        cur = self.connection.cursor()
+        tp_query = "SELECT top_url, url from response_domains " \
+                   "WHERE public_suffix = %s"
+        cur = self.connection.cursor('tp-cursor')
         cur.itersize = 100000
 
         cur.execute(tp_query, (tp_domain,))
@@ -75,12 +88,8 @@ class Census:
             if utils.should_ignore(url):
                 continue
 
-            # Check to make sure URL properly matches domain, and is not a false positive
-            url_domain = utils.get_domain(url)
-
-            if url_domain == tp_domain:
-                sites_with_tp[top_url].append(url)
-
+            sites_with_tp[top_url].append(url)
+        cur.close()
         return dict(sites_with_tp)
 
     def get_all_third_party_responses_by_site(self, top_url):

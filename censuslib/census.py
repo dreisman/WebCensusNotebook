@@ -1,6 +1,6 @@
 from BlockListParser import BlockListParser
 from collections import Counter, defaultdict
-
+import collections
 import csv
 import matplotlib.pyplot as plt
 import numpy as np
@@ -12,6 +12,124 @@ import utils
 class CensusException(Exception):
     pass
 
+class URL(object):
+    def __init__(self, url, is_js=None, is_img=None, is_tracker=None, first_party=None):
+        self.url = url
+        self._is_js = is_js
+        self._is_img = is_img
+        self.first_party = first_party
+        self._is_tracker = is_tracker
+        
+    @property
+    def is_tracker(self):
+        if self._is_tracker == None:
+            is_el_tracker = utils.is_tracker(self.url, 
+                                             is_js=self.is_js,
+                                             is_img=self.is_img, 
+                                             first_party=self.first_party.domain, 
+                                             blocklist='easylist')
+            is_ep_tracker = utils.is_tracker(self.url, 
+                                             is_js=self.is_js,
+                                             is_img=self.is_img, 
+                                             first_party=self.first_party.domain, 
+                                             blocklist='easyprivacy')
+            self._is_tracker = is_el_tracker or is_ep_tracker
+        return self._is_tracker
+    
+    @property
+    def is_js(self):
+        if self._is_js == None:
+            self._is_js = utils.is_js(url, content_type)
+        return self._is_js
+    
+    @property
+    def is_img(self):
+        if self._is_img == None:
+            self._is_img = utils.is_img(url, content_type)
+        return self._is_img
+     
+class FirstParty(object):
+    def __init__(self, fp_domain, parent_census):
+        self.domain = fp_domain
+        self.census = parent_census
+        results = self.census.get_all_third_party_responses_by_site(self.domain)
+        self.third_parties = dict()
+        for url in results:
+            tp_domain = results[url]['url_domain']
+            if tp_domain not in self.third_parties:
+                self.third_parties[tp_domain] = ThirdParty(tp_domain, self.census)
+            self.third_parties[tp_domain].URIs.append(URL(url,
+                                                          results[url]['is_js'],
+                                                          results[url]['is_img'],
+                                                          results[url]['is_tracker'],
+                                                          self))        
+
+class ThirdParty(object):
+    def __init__(self, domain, parent_census):
+        self.domain = domain
+        self.census = parent_census
+        self._organization = None
+        self.URIs = []
+        
+    @property
+    def organization(self):
+        if not self._organization:
+            try:
+                self._organization = Organization(self.domain)
+            except CensusException:
+                self._organization = None
+        return self._organization
+    
+    @organization.setter
+    def organization(self, val):
+        self._organization = val
+        
+class Organization(object):
+    def __init__(self, domain):
+        self.details = utils.get_full_organization_details(domain)
+        if not self.details:
+            raise CensusException("No organization found for : " + domain)
+        self.name = self.details['organization']
+        self.notes = self.details['notes']
+        self.domains = self.details['domains']
+        self.subsidiaries = self.details['subsidiaries']
+
+class FirstPartyDict(dict):
+    def __init__(self, parent_census, *args):
+        dict.__init__(self, args)
+        self.census = parent_census
+        
+    def __getitem__(self, key):
+        if 'http:' in key or 'https:' in key:
+            raise CensusException("Exclude scheme (http://|https://) when checking for first party")
+        if not self.census.check_top_url(key):
+            raise CensusException(key + " not in this census dataset")
+        try:
+            val = dict.__getitem__(self, key)
+        except KeyError:
+            val = FirstParty(key, self.census)
+            dict.__setitem__(self, key, val)
+        
+        return val
+
+class ThirdPartyDict(dict):
+    def __init__(self, parent_census, *args):
+        dict.__init__(self, args)
+        self.census = parent_census
+        
+    def __getitem__(self, key):
+        if 'http:' in key or 'https:' in key:
+            raise CensusException("Exclude scheme (http://|https://) when checking for first party")
+        if not self.census.check_top_url(key):
+            raise CensusException(key + " not in this census dataset")
+        results = self.census.get_all_third_party_responses_by_site(key)
+        
+        return key
+
+    def __setitem__(self, key, val):
+        raise CensusException("Census objects are read-only")
+        return
+
 class Census:
     """A class representing one census crawl.
     """
@@ -22,6 +140,8 @@ class Census:
         host = 'princeton-web-census-machine-1.cp85stjatkdd.us-east-1.rds.amazonaws.com' 
         db_details = 'dbname={0} user={1} password={2} host={3}'.format(census_name, user, password, host)
         self.connection = psycopg2.connect(db_details)
+        self.first_parties = FirstPartyDict(parent_census=self)
+        self.third_parties = ThirdPartyDict(parent_census=self)
         
     def _filter_site_list(self, sites, raise_exception=False):
         """Return a list of sites, filtered to remove sites that are not present in the dataset.

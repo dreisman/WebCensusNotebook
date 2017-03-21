@@ -13,8 +13,9 @@ class CensusException(Exception):
     pass
 
 class URL(object):
-    def __init__(self, url, is_js=None, is_img=None, is_tracker=None, first_party=None):
+    def __init__(self, url, domain, is_js=None, is_img=None, is_tracker=None, first_party=None):
         self.url = url
+        self.domain = domain
         self._is_js = is_js
         self._is_img = is_img
         self.first_party = first_party
@@ -36,41 +37,74 @@ class URL(object):
             self._is_tracker = is_el_tracker or is_ep_tracker
         return self._is_tracker
     
+    @is_tracker.setter
+    def is_tracker(self, val):
+        self._is_tracker = val
+    
     @property
     def is_js(self):
         if self._is_js == None:
             self._is_js = utils.is_js(url, content_type)
         return self._is_js
     
+    @is_js.setter
+    def is_js(self, val):
+        self._is_js = val
+       
     @property
     def is_img(self):
         if self._is_img == None:
             self._is_img = utils.is_img(url, content_type)
         return self._is_img
+    
+    @is_img.setter
+    def is_img(self, val):
+        self._is_img = val
+      
+
      
 class FirstParty(object):
     def __init__(self, fp_domain, parent_census):
         self.domain = fp_domain
         self.census = parent_census
-        results = self.census.get_all_third_party_responses_by_site(self.domain)
-        self.third_parties = dict()
-        for url in results:
-            tp_domain = results[url]['url_domain']
-            if tp_domain not in self.third_parties:
-                self.third_parties[tp_domain] = ThirdParty(tp_domain, self.census)
-            self.third_parties[tp_domain].URIs.append(URL(url,
-                                                          results[url]['is_js'],
-                                                          results[url]['is_img'],
-                                                          results[url]['is_tracker'],
-                                                          self))        
-
+        self._third_parties = None
+        
+    @property
+    def third_parties(self):
+        if not self._third_parties:
+            self._third_parties = dict()
+            results = self.census.get_all_third_party_responses_by_site(self.domain)
+            for url in results:
+                tp_domain = results[url]['url_domain']
+                if tp_domain not in self._third_parties:
+                    self._third_parties[tp_domain] = EmbeddedThirdParty(tp_domain, self, self.census)
+                self._third_parties[tp_domain].URIs.append(URL(url,
+                                                               tp_domain,
+                                                               results[url]['is_js'],
+                                                               results[url]['is_img'],
+                                                               results[url]['is_tracker'],
+                                                               self))
+        return self._third_parties
+    
+                             
 class ThirdParty(object):
     def __init__(self, domain, parent_census):
         self.domain = domain
         self.census = parent_census
         self._organization = None
-        self.URIs = []
+        self._first_parties = None
         
+    @property
+    def first_parties(self):
+        if not self._first_parties:
+            self._first_parties = dict()
+            results = self.census.get_sites_with_third_party_domain(self.domain)
+            for fp_url in results:
+                fp_domain = utils.get_domain(fp_url)
+                self._first_parties[fp_domain] = self.census.first_parties[fp_domain]
+                
+        return self._first_parties
+    
     @property
     def organization(self):
         if not self._organization:
@@ -83,6 +117,12 @@ class ThirdParty(object):
     @organization.setter
     def organization(self, val):
         self._organization = val
+
+class EmbeddedThirdParty(ThirdParty):
+    def __init__(self, tp_domain, first_party, parent_census):
+        ThirdParty.__init__(self, domain, parent_census)
+        self.URIs = []
+        self.first_party = first_party
         
 class Organization(object):
     def __init__(self, domain):
@@ -111,6 +151,9 @@ class FirstPartyDict(dict):
             dict.__setitem__(self, key, val)
         
         return val
+    
+    def __contains__(self, key):
+        return self.census.check_top_url(key)
 
 class ThirdPartyDict(dict):
     def __init__(self, parent_census, *args):
@@ -119,16 +162,14 @@ class ThirdPartyDict(dict):
         
     def __getitem__(self, key):
         if 'http:' in key or 'https:' in key:
-            raise CensusException("Exclude scheme (http://|https://) when checking for first party")
-        if not self.census.check_top_url(key):
-            raise CensusException(key + " not in this census dataset")
-        results = self.census.get_all_third_party_responses_by_site(key)
-        
-        return key
+            raise CensusException("Only specify domain when checking for third party ('example.com')")
+        try:
+            val = dict.__getitem__(self, key)
+        except KeyError:
+            val = ThirdParty(key, self.census)
+            dict.__setitem(self, key, val)
+        return val
 
-    def __setitem__(self, key, val):
-        raise CensusException("Census objects are read-only")
-        return
 
 class Census:
     """A class representing one census crawl.

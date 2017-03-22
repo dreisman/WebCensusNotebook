@@ -86,6 +86,8 @@ class FirstParty(object):
                                                                self))
         return self._third_parties
     
+    def __repr__(self):
+        return "< FirstParty containing results for url: " + self.domain + " >"
                              
 class ThirdParty(object):
     def __init__(self, domain, parent_census):
@@ -100,7 +102,7 @@ class ThirdParty(object):
             self._first_parties = dict()
             results = self.census.get_sites_with_third_party_domain(self.domain)
             for fp_url in results:
-                fp_domain = utils.get_domain(fp_url)
+                fp_domain = fp_url[7:]
                 self._first_parties[fp_domain] = self.census.first_parties[fp_domain]
                 
         return self._first_parties
@@ -120,7 +122,7 @@ class ThirdParty(object):
 
 class EmbeddedThirdParty(ThirdParty):
     def __init__(self, tp_domain, first_party, parent_census):
-        ThirdParty.__init__(self, domain, parent_census)
+        ThirdParty.__init__(self, tp_domain, parent_census)
         self.URIs = []
         self.first_party = first_party
         
@@ -134,27 +136,46 @@ class Organization(object):
         self.domains = self.details['domains']
         self.subsidiaries = self.details['subsidiaries']
 
-class FirstPartyDict(dict):
+class FirstPartyDict(collections.MutableMapping):
     def __init__(self, parent_census, *args):
-        dict.__init__(self, args)
+        self.store = dict()
         self.census = parent_census
+        self._site_list = self.census.get_sites_in_census()
         
     def __getitem__(self, key):
         if 'http:' in key or 'https:' in key:
             raise CensusException("Exclude scheme (http://|https://) when checking for first party")
-        if not self.census.check_top_url(key):
+        if key not in self._site_list:
             raise CensusException(key + " not in this census dataset")
         try:
-            val = dict.__getitem__(self, key)
+            val = self.store[key]
         except KeyError:
             val = FirstParty(key, self.census)
-            dict.__setitem__(self, key, val)
+            self.store[key] = val
         
         return val
     
-    def __contains__(self, key):
-        return self.census.check_top_url(key)
+    def __setitem__(self, key, value):
+        self.store[self.__keytransform__(key)] = value
 
+    def __delitem__(self, key):
+        del self.store[self.__keytransform__(key)]
+
+    def __iter__(self):
+        return iter(self._site_list)
+
+    def __contains__(self, key):
+        return key in self._site_list
+    
+    def __len__(self):
+        return len(self._site_list)
+
+    def __keytransform__(self, key):
+        return key
+    
+    def __repr__(self):
+        return "< FirstParties on census '" + self.census.census_name + "', indexed by site url >"
+    
 class ThirdPartyDict(dict):
     def __init__(self, parent_census, *args):
         dict.__init__(self, args)
@@ -167,7 +188,7 @@ class ThirdPartyDict(dict):
             val = dict.__getitem__(self, key)
         except KeyError:
             val = ThirdParty(key, self.census)
-            dict.__setitem(self, key, val)
+            dict.__setitem__(self, key, val)
         return val
 
 
@@ -180,6 +201,7 @@ class Census:
         password = 'Pwcpdtwca!'
         host = 'princeton-web-census-machine-1.cp85stjatkdd.us-east-1.rds.amazonaws.com' 
         db_details = 'dbname={0} user={1} password={2} host={3}'.format(census_name, user, password, host)
+        self.census_name = census_name
         self.connection = psycopg2.connect(db_details)
         self.first_parties = FirstPartyDict(parent_census=self)
         self.third_parties = ThirdPartyDict(parent_census=self)

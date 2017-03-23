@@ -14,26 +14,38 @@ class CensusException(Exception):
 
 class URI(object):
     def __init__(self, url, domain, is_js=None, is_img=None, is_tracker=None, first_party=None, parent_census=None):
-        self.url = url
-        self.domain = domain
+        self._url = url
+        self._domain = domain
         self._is_js = is_js
         self._is_img = is_img
-        self.first_party = first_party
+        self._first_party = first_party
         self._is_tracker = is_tracker
         self.census = parent_census
-        
+    
+    @property
+    def url(self):
+        return self._url
+    
+    @property
+    def domain(self):
+        return self._domain
+    
+    @property
+    def first_party(self):
+        return self._first_party
+    
     @property
     def is_tracker(self):
         if self._is_tracker == None:
-            is_el_tracker = utils.is_tracker(self.url, 
-                                             is_js=self.is_js,
-                                             is_img=self.is_img, 
-                                             first_party=self.first_party.domain, 
+            is_el_tracker = utils.is_tracker(self._url, 
+                                             is_js=self._is_js,
+                                             is_img=self._is_img, 
+                                             first_party=self._first_party._domain, 
                                              blocklist='easylist')
-            is_ep_tracker = utils.is_tracker(self.url, 
-                                             is_js=self.is_js,
-                                             is_img=self.is_img, 
-                                             first_party=self.first_party.domain, 
+            is_ep_tracker = utils.is_tracker(self._url, 
+                                             is_js=self._is_js,
+                                             is_img=self._is_img, 
+                                             first_party=self._first_party._domain, 
                                              blocklist='easyprivacy')
             self._is_tracker = is_el_tracker or is_ep_tracker
         return self._is_tracker
@@ -45,7 +57,7 @@ class URI(object):
     @property
     def is_js(self):
         if self._is_js == None:
-            self._is_js = utils.is_js(url, content_type)
+            self._is_js = utils.is_js(self._url, content_type)
         return self._is_js
     
     @is_js.setter
@@ -55,7 +67,7 @@ class URI(object):
     @property
     def is_img(self):
         if self._is_img == None:
-            self._is_img = utils.is_img(url, content_type)
+            self._is_img = utils.is_img(self._url, content_type)
         return self._is_img
     
     @is_img.setter
@@ -64,41 +76,50 @@ class URI(object):
       
     @property
     def third_party(self):
-        return self.census.third_parties[self.domain]
+        return self.census.third_parties[self._domain]
+    
+    @property
+    def help(self):
+        print("Available properties of " + str(type(self)) + ":")
+        print([p for p in dir(type(self)) if isinstance(getattr(type(self),p),property)])
     
     def __repr__(self):
         return "<URI located at '" + self.url + "'>"
      
 class FirstParty(object):
     def __init__(self, fp_domain, parent_census):
-        self.domain = fp_domain
+        self._domain = fp_domain
         self.census = parent_census
         self._third_parties = None
         self._third_party_resources = None
         self._cookie_syncs = None
         
+    #@property
+    #def third_parties(self):
+    #    if not self._third_parties:
+    #        self._third_parties = dict()
+    #        results = self.census.get_all_third_party_responses_by_site(self.domain)
+    #        for url in results:
+    #            tp_domain = results[url]['url_domain']
+    #            if tp_domain not in self._third_parties:
+    #                self._third_parties[tp_domain] = EmbeddedThirdParty(tp_domain, self, self.census)
+    #            self._third_parties[tp_domain].URIs.append(URI(url,
+    #                                                           tp_domain,
+    #                                                           results[url]['is_js'],
+    #                                                           results[url]['is_img'],
+    #                                                           results[url]['is_tracker'],
+    #                                                           self))
+    #    return self._third_parties
+    
     @property
-    def third_parties(self):
-        if not self._third_parties:
-            self._third_parties = dict()
-            results = self.census.get_all_third_party_responses_by_site(self.domain)
-            for url in results:
-                tp_domain = results[url]['url_domain']
-                if tp_domain not in self._third_parties:
-                    self._third_parties[tp_domain] = EmbeddedThirdParty(tp_domain, self, self.census)
-                self._third_parties[tp_domain].URIs.append(URI(url,
-                                                               tp_domain,
-                                                               results[url]['is_js'],
-                                                               results[url]['is_img'],
-                                                               results[url]['is_tracker'],
-                                                               self))
-        return self._third_parties
+    def url(self):
+        return 'http://' + self._domain
     
     @property
     def third_party_resources(self):
         if self._third_party_resources == None:
             self._third_party_resources = []
-            results = self.census.get_all_third_party_responses_by_site(self.domain)
+            results = self.census.get_all_third_party_responses_by_site(self._domain)
             for url in results:
                 tp_domain = results[url]['url_domain']
                 self._third_party_resources.append(URI(url,
@@ -113,23 +134,34 @@ class FirstParty(object):
     def cookie_syncs(self):
         # TODO(dillon): Add cookie syncing logic to FirstParty
         raise CensusException("Cookie syncing not yet implemented!")
-            
+
+    @property
+    def help(self):
+        print("Available properties of " + str(type(self)) + ":")
+        print([p for p in dir(type(self)) if isinstance(getattr(type(self),p),property)])
+        print("(third_party_resources is a list of third-party URIs found on this FirstParty)")
     
     def __repr__(self):
-        return "< FirstParty containing results for url: " + self.domain + ">"
+        return "< FirstParty containing results for url: " + self.url + ">"
                              
 class ThirdParty(object):
     def __init__(self, domain, parent_census):
-        self.domain = domain
+        self._domain = domain
         self.census = parent_census
         self._organization = None
         self._first_parties = None
-        
+    
+    @property
+    def domain(self):
+        return self._domain
+    
     @property
     def first_parties(self):
         if not self._first_parties:
             self._first_parties = dict()
-            results = self.census.get_sites_with_third_party_domain(self.domain)
+            print("fetching first parties...")
+            results = self.census.get_sites_with_third_party_domain(self._domain)
+            print("...done fetching")
             for fp_url in results:
                 fp_domain = fp_url[7:]
                 self._first_parties[fp_domain] = self.census.first_parties[fp_domain]
@@ -139,18 +171,21 @@ class ThirdParty(object):
     @property
     def organization(self):
         if not self._organization:
-            try:
-                self._organization = Organization(self.domain)
-            except CensusException:
-                self._organization = None
+            self._organization = Organization(self._domain)
         return self._organization
     
     @organization.setter
     def organization(self, val):
         self._organization = val
         
+    @property
+    def help(self):
+        print("Available properties of " + str(type(self)) + ":")
+        print([p for p in dir(type(self)) if isinstance(getattr(type(self),p),property)])
+        print("(first_parties is a dictionary indexing FirstPartys that have this particular ThirdParty)")
+        
     def __repr__(self):
-        return "<ThirdParty with domain : '" + self.domain + "'>"
+        return "<ThirdParty with domain : '" + self._domain + "'>"
 
 class EmbeddedThirdParty(ThirdParty):
     def __init__(self, tp_domain, first_party, parent_census):
@@ -160,14 +195,35 @@ class EmbeddedThirdParty(ThirdParty):
         
 class Organization(object):
     def __init__(self, domain):
-        self.details = utils.get_full_organization_details(domain)
-        if not self.details:
+        self._details = utils.get_full_organization_details(domain)
+        if not self._details:
             raise CensusException("No organization found for : " + domain)
-        self.name = self.details['organization']
-        self.notes = self.details['notes']
-        self.domains = self.details['domains']
-        self.subsidiaries = self.details['subsidiaries']
-        
+        self._name = self._details['organization']
+        self._notes = self._details['notes']
+        self._domains = self._details['domains']
+        self._subsidiaries = self._details['subsidiaries']
+    
+    @property
+    def name(self):
+        return self._name
+    
+    @property
+    def notes(self):
+        return self._notes
+    
+    @property
+    def domains(self):
+        return self._domains
+    
+    @property
+    def subsidiaries(self):
+        return self._subsidiaries
+    
+    @property
+    def help(self):
+        print("Available properties of " + str(type(self)) + ":")
+        print([p for p in dir(type(self)) if isinstance(getattr(type(self),p),property)])
+    
     def __repr__(self):
         return "<Organization : " + self.name + " >"
 
@@ -176,11 +232,12 @@ class FirstPartyDict(collections.MutableMapping):
         self.store = dict()
         self.census = parent_census
         self._site_list = self.census.get_sites_in_census()
+        self._site_set = set(self._site_list)
         
     def __getitem__(self, key):
         if 'http:' in key or 'https:' in key:
             raise CensusException("Exclude scheme (http://|https://) when checking for first party")
-        if key not in self._site_list:
+        if key not in self._site_set:
             raise CensusException(key + " not in this census dataset")
         try:
             val = self.store[self.__keytransform__(key)]
@@ -200,7 +257,7 @@ class FirstPartyDict(collections.MutableMapping):
         return iter(self._site_list)
 
     def __contains__(self, key):
-        return key in self._site_list
+        return key in self._site_set
     
     def __len__(self):
         return len(self._site_list)
@@ -211,6 +268,12 @@ class FirstPartyDict(collections.MutableMapping):
     def __repr__(self):
         return "<FirstParties on census '" + self.census.census_name + "', indexed by site url>"
     
+    @property
+    def help(self):
+        print("This object indexes all first parties that were visited in the census.")
+        print("To access a first party's data for 'example.com', try retrieving first_parties['example.com']")
+        print("That will return a FirstParty object representing that first party visit")
+
 class ThirdPartyDict(collections.MutableMapping):
     def __init__(self, parent_census):
         self.store = dict()
@@ -250,6 +313,12 @@ class ThirdPartyDict(collections.MutableMapping):
     def __repr__(self):
         return "<ThirdParties on census '" + self.census.census_name + "', indexed by third-party domain>"
     
+    @property
+    def help(self):
+        print("This object indexes all third party domains that were seen in the census.")
+        print("To access a third party's data for 'example.com', try third_parties['example.com']")
+        print("That will return a ThirdParty object representing that domain")
+              
 class Census:
     """A class representing one census crawl.
     """
@@ -263,7 +332,10 @@ class Census:
         self.connection = psycopg2.connect(db_details)
         self.first_parties = FirstPartyDict(parent_census=self)
         self.third_parties = ThirdPartyDict(parent_census=self)
-        
+    
+    def __del__(self):
+        self.connection.close()
+    
     def __repr__(self):
         return "<Census '" + self.census_name + "'. Access first_parties or third_parties properties for more info.>"
         

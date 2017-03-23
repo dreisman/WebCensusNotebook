@@ -271,8 +271,8 @@ class FirstPartyDict(collections.MutableMapping):
     @property
     def help(self):
         print("This object indexes all first parties that were visited in the census.")
-        print("To access a first party's data for 'example.com', try retrieving first_parties['example.com']")
-        print("That will return a FirstParty object representing that first party visit")
+        print("To access data for the first party 'example.com', try retrieving first_parties['example.com'].")
+        print("That will return a FirstParty object.")
 
 class ThirdPartyDict(collections.MutableMapping):
     def __init__(self, parent_census):
@@ -316,8 +316,8 @@ class ThirdPartyDict(collections.MutableMapping):
     @property
     def help(self):
         print("This object indexes all third party domains that were seen in the census.")
-        print("To access a third party's data for 'example.com', try third_parties['example.com']")
-        print("That will return a ThirdParty object representing that domain")
+        print("To access data from the crawl for the third-party domain 'example.com', try third_parties['example.com'].")
+        print("That will return a ThirdParty object.")
               
 class Census:
     """A class representing one census crawl.
@@ -335,6 +335,12 @@ class Census:
     
     def __del__(self):
         self.connection.close()
+    
+    @property
+    def help(self):
+        print("A Census object represents one census crawl.")
+        print("Census.third_parties indexes third-party domains seen in this census crawl.")
+        print("Census.first_parties indexes first-party sites visited in this census crawl.")
     
     def __repr__(self):
         return "<Census '" + self.census_name + "'. Access first_parties or third_parties properties for more info.>"

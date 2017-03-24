@@ -117,7 +117,6 @@ class FirstParty(object):
         self._third_parties = None
         self._third_party_resources = None
         self._cookie_syncs = None
-        self._alexa_rank = None
         
     @property
     def third_parties(self):
@@ -137,10 +136,8 @@ class FirstParty(object):
     
     @property
     def alexa_rank(self):
-        if not self._alexa_rank:
-            self._alexa_rank = self.census.get_alexa_rank(self._domain)
-        return self._alexa_rank
-    
+        return self.census.first_parties._alexa_ranks[self._domain]
+        
     @property
     def third_party_resources(self):
         if self._third_party_resources == None:
@@ -242,7 +239,7 @@ class Organization(object):
         self._notes = self._details['notes']
         self._domains = self._details['domains']
         self._subsidiaries = self._details['subsidiaries']
-    
+
     @property
     def name(self):
         return self._name
@@ -271,6 +268,9 @@ class FirstPartyDict(collections.MutableMapping):
     """This object indexes all first parties that were visited in the census.
     To access data for the first party 'example.com', try retrieving
     first_parties['example.com']. That will return a FirstParty object.
+    
+    Also includes:
+    - first_parties.alexa_rankings : An ordered list of Alexa rankings
     """
     
     def __init__(self, parent_census):
@@ -278,6 +278,8 @@ class FirstPartyDict(collections.MutableMapping):
         self.census = parent_census
         self._site_list = self.census.get_sites_in_census()
         self._site_set = set(self._site_list)
+        self._alexa_ranks = self.census.get_alexa_rankings()
+        self._alexa_list = None
         
     def __getitem__(self, key):
         if 'http:' in key or 'https:' in key:
@@ -314,6 +316,13 @@ class FirstPartyDict(collections.MutableMapping):
         return "<FirstParties on census '" + self.census.census_name + "', indexed by site url>"
     
     @property
+    def alexa_ranking(self):
+        """Return Alexa rankings in an ordered list."""
+        if not self._alexa_list:
+            self._alexa_list = sorted(list(self._alexa_ranks.items()), key = lambda x : x[1])
+        return self._alexa_list
+    
+    @property
     def help(self):
         print("This object indexes all first parties that were visited in the census.")
         print("To access data for the first party 'example.com', try retrieving first_parties['example.com'].")
@@ -327,6 +336,8 @@ class ThirdPartyDict(collections.MutableMapping):
     def __init__(self, parent_census):
         self.store = dict()
         self.census = parent_census
+        self._domain_list = self.census.get_domains_in_census()
+        self._domain_set = set(self._domain_list)
         
     def __getitem__(self, key):
         if 'http:' in key or 'https:' in key:
@@ -350,7 +361,7 @@ class ThirdPartyDict(collections.MutableMapping):
         raise CensusException("Cannot iterate over ThirdParty object --- too many to render!")
 
     def __contains__(self, key):
-        return self.census.check_third_party_domain(key)
+        return key in self._domain_set
     
     def __len__(self):
         # TODO(dillon): Once the table has been materialized, make this do the right check
@@ -421,18 +432,19 @@ class Census:
         
         return present_sites
     
-    def get_alexa_rank(self, top_url):
-        """Retrieve Alexa rank for given top_url."""
-        query = "SELECT rank FROM alexa_rank WHERE top_url = %s"
+    def get_alexa_rankings(self):
+        """Retrieve Alexa rankings used in census as a dict mapping urls to rank."""
+        query = "SELECT rank, top_url FROM alexa_rank"
         
         cur = self.connection.cursor()
         cur.itersize = 100000
-        cur.execute(query, (top_url,))
+        cur.execute(query)
         
-        for rank, in cur:
-            return rank
+        rankings = dict()
+        for rank, top_url in cur:
+            rankings[top_url] = rank
         
-        raise CensusException("No Alexa rank found for " + top_url)
+        return rankings
     
     def get_sites_in_census(self):
         """Return a list of top_urls in census."""
@@ -446,6 +458,19 @@ class Census:
         for top_url, in cur:
             sites.append(top_url[7:])
         return sites
+    
+    def get_domains_in_census(self):
+        """Return a list of all domains seen in census."""
+        query = "SELECT public_suffix FROM public_suffix_list"""
+        
+        cur = self.connection.cursor()
+        cur.itersize = 100000
+        cur.execute(query)
+        
+        domains = []
+        for public_suffix, in cur:
+            domains.append(public_suffix)
+        return domains
     
     def check_top_url(self, top_url):
         """Return True if a top_url is present in the census."""
@@ -478,9 +503,9 @@ class Census:
     
     def get_sites_with_third_party_domain(self, tp_domain):
         """Return a list of top_urls that have a particular embedded third party."""
-        tp_query = "SELECT DISTINCT response_domains.top_url " \
-                   "FROM response_domains LEFT JOIN public_suffix_list " \
-                   "ON response_domains.ps_id = public_suffix_list.id  " \
+        tp_query = "SELECT third_party_by_ps.top_url " \
+                   "FROM third_party_by_ps LEFT JOIN public_suffix_list " \
+                   "ON third_party_by_ps.ps_id = public_suffix_list.id  " \
                    "WHERE public_suffix_list.public_suffix = %s;"
         cur = self.connection.cursor('tp-cursor')
         cur.itersize = 100000

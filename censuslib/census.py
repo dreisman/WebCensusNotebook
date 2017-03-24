@@ -108,6 +108,8 @@ class FirstParty(object):
                                  
     - FirstParty.third_parties : A dict of the ThirdParty objects of the third parties
                                  that were loaded.
+                                 
+    - FirstParty.alexa_rank : The Alexa rank of the FirstParty, at crawl time                             
     """
     def __init__(self, fp_domain, parent_census):
         self._domain = fp_domain
@@ -115,6 +117,7 @@ class FirstParty(object):
         self._third_parties = None
         self._third_party_resources = None
         self._cookie_syncs = None
+        self._alexa_rank = None
         
     @property
     def third_parties(self):
@@ -131,6 +134,12 @@ class FirstParty(object):
     @property
     def url(self):
         return 'http://' + self._domain
+    
+    @property
+    def alexa_rank(self):
+        if not self._alexa_rank:
+            self._alexa_rank = self.census.get_alexa_rank(self._domain)
+        return self._alexa_rank
     
     @property
     def third_party_resources(self):
@@ -411,6 +420,19 @@ class Census:
                 raise CensusException("Sites were included that are not present in the dataset.")
         
         return present_sites
+    
+    def get_alexa_rank(self, top_url):
+        """Retrieve Alexa rank for given top_url."""
+        query = "SELECT rank FROM alexa_rank WHERE top_url = %s"
+        
+        cur = self.connection.cursor()
+        cur.itersize = 100000
+        cur.execute(query, (top_url,))
+        
+        for rank, in cur:
+            return rank
+        
+        raise CensusException("No Alexa rank found for " + top_url)
     
     def get_sites_in_census(self):
         """Return a list of top_urls in census."""

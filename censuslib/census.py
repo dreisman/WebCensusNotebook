@@ -13,6 +13,17 @@ class CensusException(Exception):
     pass
 
 class URI(object):
+    """A URI object represents a single instance of a resource embedded on a FirstParty.
+    
+    A URI object contains:
+    - URI.url : The URL of this resource.
+    - URI.domain : The domain name of this resource
+    - URI.first_party : The FirstParty object where this resource is located.
+    - URI.third_party : A ThirdParty object for this resource's third-party domain.
+    - URI.is_tracker : A boolean indicating if this resource was identified as a tracker.
+    - URI.is_js : A boolean indicating if this resource is javascript.
+    - URI.is_img : A boolean indicating if this resource is an image.
+    """
     def __init__(self, url, domain, is_js=None, is_img=None, is_tracker=None, first_party=None, parent_census=None):
         self._url = url
         self._domain = domain
@@ -87,6 +98,17 @@ class URI(object):
         return "<URI located at '" + self.url + "'>"
      
 class FirstParty(object):
+    """A FirstParty object represents a first-party website visited in the census crawl.
+    
+    Available properties of a FirstParty are:
+    - FirstParty.url : The full url visited in the crawl.
+    
+    - FirstParty.third_party_resources : A list of URIs belonging to third parties that
+                                         were loaded on the FirstParty website.
+                                 
+    - FirstParty.third_parties : A dict of the ThirdParty objects of the third parties
+                                 that were loaded.
+    """
     def __init__(self, fp_domain, parent_census):
         self._domain = fp_domain
         self.census = parent_census
@@ -94,22 +116,17 @@ class FirstParty(object):
         self._third_party_resources = None
         self._cookie_syncs = None
         
-    #@property
-    #def third_parties(self):
-    #    if not self._third_parties:
-    #        self._third_parties = dict()
-    #        results = self.census.get_all_third_party_responses_by_site(self.domain)
-    #        for url in results:
-    #            tp_domain = results[url]['url_domain']
-    #            if tp_domain not in self._third_parties:
-    #                self._third_parties[tp_domain] = EmbeddedThirdParty(tp_domain, self, self.census)
-    #            self._third_parties[tp_domain].URIs.append(URI(url,
-    #                                                           tp_domain,
-    #                                                           results[url]['is_js'],
-    #                                                           results[url]['is_img'],
-    #                                                           results[url]['is_tracker'],
-    #                                                           self))
-    #    return self._third_parties
+    @property
+    def third_parties(self):
+        if not self._third_parties:
+            self._third_parties = dict()
+            results = self.census.get_all_third_party_responses_by_site(self._domain)
+            for url in results:
+                tp_domain = results[url]['url_domain']
+                if tp_domain not in self._third_parties:
+                    self._third_parties[tp_domain] = self.census.third_parties[tp_domain]
+                    
+        return self._third_parties
     
     @property
     def url(self):
@@ -145,6 +162,17 @@ class FirstParty(object):
         return "< FirstParty containing results for url: " + self.url + ">"
                              
 class ThirdParty(object):
+    """A ThirdParty represents a particular third-party domain seen in the census crawl.
+    
+    Available properties of a ThirdParty are:
+    - ThirdParty.first_parties : A dict of FirstParty objects that this ThirdParty is found on,
+                                 indexed by first-party domain.
+                                 
+    - ThirdParty.domain : The ThirdParty's domain.
+    
+    - ThirdParty.organization : The Organization owning this ThirdParty (raises exception if
+                                no organization identified).           
+    """
     def __init__(self, domain, parent_census):
         self._domain = domain
         self.census = parent_census
@@ -186,14 +214,17 @@ class ThirdParty(object):
         
     def __repr__(self):
         return "<ThirdParty with domain : '" + self._domain + "'>"
-
-class EmbeddedThirdParty(ThirdParty):
-    def __init__(self, tp_domain, first_party, parent_census):
-        ThirdParty.__init__(self, tp_domain, parent_census)
-        self.URIs = []
-        self.first_party = first_party
         
 class Organization(object):
+    """An organization represents one business entity, and contains information about
+    domains they control.
+    
+    Available properties:
+    - Organization.name : Name of the organization
+    - Organization.notes : Comments about organization
+    - Organization.domains : A list of domains the org. controls.
+    - Organization.subsidiaries : A list of strings representing owned-subsidiaries
+    """
     def __init__(self, domain):
         self._details = utils.get_full_organization_details(domain)
         if not self._details:
@@ -228,6 +259,11 @@ class Organization(object):
         return "<Organization : " + self.name + " >"
 
 class FirstPartyDict(collections.MutableMapping):
+    """This object indexes all first parties that were visited in the census.
+    To access data for the first party 'example.com', try retrieving
+    first_parties['example.com']. That will return a FirstParty object.
+    """
+    
     def __init__(self, parent_census):
         self.store = dict()
         self.census = parent_census
@@ -275,6 +311,10 @@ class FirstPartyDict(collections.MutableMapping):
         print("That will return a FirstParty object.")
 
 class ThirdPartyDict(collections.MutableMapping):
+    """This object indexes all third party domains that were seen in the census
+    To access data from the crawl for the third-party domain 'example.com',
+    try third_parties['example.com']. That will return a ThirdParty object.
+    """
     def __init__(self, parent_census):
         self.store = dict()
         self.census = parent_census
@@ -321,6 +361,10 @@ class ThirdPartyDict(collections.MutableMapping):
               
 class Census:
     """A class representing one census crawl.
+    
+    To start accessing data, access one of two properties:
+    - Census.first_parties : A dict of first-parties visited in the census crawl, indexed by first-party domain.
+    - Census.third_parties : A dict of third-parties visited in the census crawl, indexed by third-party domain.
     """
     
     def __init__(self, census_name):
@@ -411,22 +455,22 @@ class Census:
         return False        
     
     def get_sites_with_third_party_domain(self, tp_domain):
-        """Return a dictionary mapping top_url -> list(tp_urls_from_tp_domain)"""
-        tp_query = "SELECT top_url, url from response_domains " \
-                   "WHERE public_suffix = %s"
+        """Return a list of top_urls that have a particular embedded third party."""
+        tp_query = "SELECT DISTINCT response_domains.top_url " \
+                   "FROM response_domains LEFT JOIN public_suffix_list " \
+                   "ON response_domains.ps_id = public_suffix_list.id  " \
+                   "WHERE public_suffix_list.public_suffix = %s;"
         cur = self.connection.cursor('tp-cursor')
         cur.itersize = 100000
 
         cur.execute(tp_query, (tp_domain,))
 
-        sites_with_tp = defaultdict(list)
-        for top_url, url in cur:
-            if utils.should_ignore(url):
-                continue
-
-            sites_with_tp[top_url].append(url)
+        sites_with_tp = []
+        for top_url, in cur:
+            sites_with_tp.append(top_url)
+            
         cur.close()
-        return dict(sites_with_tp)
+        return sites_with_tp
 
     def get_all_third_party_responses_by_site(self, top_url):
         """Return a dictionary containing third party data loaded on given top_url."""

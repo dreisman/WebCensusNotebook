@@ -96,7 +96,16 @@ class URI(object):
     
     def __repr__(self):
         return "<URI located at '" + self.url + "'>"
-     
+    
+    def __eq__(self, other):
+        return other and self._url == other._url
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __hash__(self):
+        return hash(self._url)
+    
 class FirstParty(object):
     """A FirstParty object represents a first-party website visited in the census crawl.
     
@@ -166,13 +175,25 @@ class FirstParty(object):
     
     def __repr__(self):
         return "< FirstParty containing results for url: " + self.url + ">"
-                             
+    
+    def __eq__(self, other):
+        return other and self._domain == other._domain
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __hash__(self):
+        return hash(self._domain)
+    
 class ThirdParty(object):
     """A ThirdParty represents a particular third-party domain seen in the census crawl.
     
     Available properties of a ThirdParty are:
     - ThirdParty.first_parties : A dict of FirstParty objects that this ThirdParty is found on,
                                  indexed by first-party domain.
+    
+    - ThirdParty.all_resources : A dict of FirstParty objects indexed by the full URL of 
+                                 the third-party resource found on the first party.
                                  
     - ThirdParty.domain : The ThirdParty's domain.
     
@@ -184,6 +205,18 @@ class ThirdParty(object):
         self.census = parent_census
         self._organization = None
         self._first_parties = None
+        self._all_resources = None
+        
+    @property
+    def all_resources(self):
+        if not self._all_resources:
+            self._all_resources = defaultdict(set)
+            results = self.census.get_sites_with_third_party_domain(self._domain)
+            for fp_url, url in results:
+                fp_domain = fp_url[7:]
+                self._all_resources[url].add(self.census.first_parties[fp_domain])
+            self._all_resources = dict(self._all_resources)
+        return self._all_resources
     
     @property
     def domain(self):
@@ -196,12 +229,12 @@ class ThirdParty(object):
             print("fetching first parties...")
             results = self.census.get_sites_with_third_party_domain(self._domain)
             print("...done fetching")
-            for fp_url in results:
+            for fp_url, url in results:
                 fp_domain = fp_url[7:]
                 self._first_parties[fp_domain] = self.census.first_parties[fp_domain]
                 
         return self._first_parties
-    
+        
     @property
     def organization(self):
         if not self._organization:
@@ -502,10 +535,19 @@ class Census:
         return False        
     
     def get_sites_with_third_party_domain(self, tp_domain):
-        """Return a list of top_urls that have a particular embedded third party."""
-        tp_query = "SELECT third_party_by_ps.top_url " \
-                   "FROM third_party_by_ps LEFT JOIN public_suffix_list " \
-                   "ON third_party_by_ps.ps_id = public_suffix_list.id  " \
+        """Return a list of tuples representing first_parties that have a particular embedded third party.
+        
+        The tuple matches a first_party to the full URL belonging to that third party.
+        I.E : get_sites_with_third_party_domain('example.com')
+        [('homepage.com', 'http://example.com/a_particular_resource'),
+         ('homepage.com', 'http://example.com/a_different_resource')
+         ('anotherpage.com', 'http://example.com/a_particular_resource')
+        ]
+        """
+
+        tp_query = "SELECT response_domains.top_url, response_domains.url " \
+                   "FROM response_domains LEFT JOIN public_suffix_list " \
+                   "ON response_domains.ps_id = public_suffix_list.id  " \
                    "WHERE public_suffix_list.public_suffix = %s;"
         cur = self.connection.cursor('tp-cursor')
         cur.itersize = 100000
@@ -513,12 +555,12 @@ class Census:
         cur.execute(tp_query, (tp_domain,))
 
         sites_with_tp = []
-        for top_url, in cur:
-            sites_with_tp.append(top_url)
+        for top_url, url in cur:
+            sites_with_tp.append((top_url, url))
             
         cur.close()
         return sites_with_tp
-
+    
     def get_all_third_party_responses_by_site(self, top_url):
         """Return a dictionary containing third party data loaded on given top_url."""
         top_url = 'http://' + top_url

@@ -132,17 +132,26 @@ class FirstParty(object):
         self._third_parties = None
         self._third_party_resources = None
         self._cookie_syncs = None
-        
+    
+    def _grab_third_parties(self):
+        self._third_parties = dict()
+        self._third_party_resources = dict()
+        results = self.census.get_all_third_party_responses_by_site(self._domain, lazy=True)
+        for url in results:
+            tp_domain = results[url]['url_domain']
+            self._third_party_resources[url] = URI(url,
+                                                   tp_domain,
+                                                   is_js=results[url]['is_js'],
+                                                   is_img=results[url]['is_img'],
+                                                   first_party=self,
+                                                   parent_census=self.census)
+            if tp_domain not in self._third_parties:
+                self._third_parties[tp_domain] = self.census.third_parties[tp_domain]
+            
     @property
     def third_parties(self):
         if not self._third_parties:
-            self._third_parties = dict()
-            results = self.census.get_all_third_party_responses_by_site(self._domain)
-            for url in results:
-                tp_domain = results[url]['url_domain']
-                if tp_domain not in self._third_parties:
-                    self._third_parties[tp_domain] = self.census.third_parties[tp_domain]
-                    
+            self._grab_third_parties()
         return self._third_parties
     
     @property
@@ -156,16 +165,7 @@ class FirstParty(object):
     @property
     def third_party_resources(self):
         if self._third_party_resources == None:
-            self._third_party_resources = []
-            results = self.census.get_all_third_party_responses_by_site(self._domain)
-            for url in results:
-                tp_domain = results[url]['url_domain']
-                self._third_party_resources.append(URI(url,
-                                                       tp_domain,
-                                                       results[url]['is_js'],
-                                                       results[url]['is_img'],
-                                                       results[url]['is_tracker'],
-                                                       self))
+            self._grab_third_parties()
         return self._third_party_resources
     
     @property
@@ -567,7 +567,7 @@ class Census:
         cur.close()
         return sites_with_tp
     
-    def get_all_third_party_responses_by_site(self, top_url):
+    def get_all_third_party_responses_by_site(self, top_url, lazy=False):
         """Return a dictionary containing third party data loaded on given top_url."""
         top_url = 'http://' + top_url
         tp_query = "SELECT r.url, h.value FROM http_responses_view AS r " \
@@ -598,23 +598,24 @@ class Census:
 
             is_js = utils.is_js(url, content_type)
             is_img = utils.is_img(url, content_type)
-            is_el_tracker = utils.is_tracker(url, 
-                                             is_js=is_js,
-                                             is_img=is_img, 
-                                             first_party=top_url, 
-                                             blocklist='easylist')
-            is_ep_tracker = utils.is_tracker(url, 
-                                             is_js=is_js,
-                                             is_img=is_img, 
-                                             first_party=top_url, 
-                                             blocklist='easyprivacy')
-            is_tracker = is_el_tracker or is_ep_tracker
+            if not lazy:
+                is_el_tracker = utils.is_tracker(url, 
+                                                 is_js=is_js,
+                                                 is_img=is_img, 
+                                                 first_party=top_url, 
+                                                 blocklist='easylist')
+                is_ep_tracker = utils.is_tracker(url, 
+                                                 is_js=is_js,
+                                                 is_img=is_img, 
+                                                 first_party=top_url, 
+                                                 blocklist='easyprivacy')
+                is_tracker = is_el_tracker or is_ep_tracker
+                url_data['is_tracker'] = is_tracker
 
             organization = utils.get_org(url)
             
             url_data['is_js'] = is_js
             url_data['is_img'] = is_img
-            url_data['is_tracker'] = is_tracker
             url_data['organization_name'] = organization
             
             response_data[url] = url_data

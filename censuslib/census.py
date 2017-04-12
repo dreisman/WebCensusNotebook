@@ -23,6 +23,7 @@ class URI(object):
     - URI.is_tracker : A boolean indicating if this resource was identified as a tracker.
     - URI.is_js : A boolean indicating if this resource is javascript.
     - URI.is_img : A boolean indicating if this resource is an image.
+    - URI.is_secure : A boolean indicating if this resource was loaded via HTTPS.
     """
     def __init__(self, url, domain, is_js=None, is_img=None, is_tracker=None, first_party=None, parent_census=None):
         self._url = url
@@ -31,6 +32,7 @@ class URI(object):
         self._is_img = is_img
         self._first_party = first_party
         self._is_tracker = is_tracker
+        self._is_secure = url[:5] == 'https'
         self.census = parent_census
     
     @property
@@ -44,6 +46,10 @@ class URI(object):
     @property
     def first_party(self):
         return self._first_party
+    
+    @property
+    def is_secure(self):
+        return self._is_secure
     
     @property
     def is_tracker(self):

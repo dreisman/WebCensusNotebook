@@ -4,11 +4,14 @@ from ipaddress import ip_address
 from publicsuffix import PublicSuffixList, fetch
 from urllib.parse import urlparse
 
+import codecs
 import json
 
+PSL_CACHE_LOC = 'public_suffix_list.dat'
+
 # Execute on module load
-psl_file = fetch()
-psl = PublicSuffixList(psl_file)
+psl_cache = codecs.open(PSL_CACHE_LOC, encoding='utf8')
+psl = PublicSuffixList(psl_cache)
 el_parser = BlockListParser('easylist.txt')
 ep_parser = BlockListParser('easyprivacy.txt')
 

@@ -212,6 +212,7 @@ class ThirdParty(object):
         self._organization = None
         self._first_parties = None
         self._all_resources = None
+        self._prominence = None
         
     @property
     def all_resources(self):
@@ -229,12 +230,16 @@ class ThirdParty(object):
         return self._domain
     
     @property
+    def prominence(self):
+        if self._prominence == None:
+            self._prominence = self.census.third_parties._prominence[self._domain]
+        return self._prominence
+    
+    @property
     def first_parties(self):
         if not self._first_parties:
             self._first_parties = dict()
-            print("fetching first parties...")
             results = self.census.get_sites_with_third_party_domain(self._domain)
-            print("...done fetching")
             for fp_url, url in results:
                 fp_domain = fp_url[7:]
                 self._first_parties[fp_domain] = self.census.first_parties[fp_domain]
@@ -376,7 +381,10 @@ class ThirdPartyDict(collections.MutableMapping):
         self.store = dict()
         self.census = parent_census
         self._domain_list = self.census.get_domains_in_census()
-        self._domain_set = set(self._domain_list)
+        self._domain_set = set([x[0] for x in self._domain_list])
+        self._prominence = dict()
+        for domain, prom in self._domain_list:
+            self._prominence[domain] = prom
         
     def __getitem__(self, key):
         if 'http:' in key or 'https:' in key:
@@ -397,7 +405,7 @@ class ThirdPartyDict(collections.MutableMapping):
         del self.store[self.__keytransform__(key)]
 
     def __iter__(self):
-        raise CensusException("Cannot iterate over ThirdParty object --- too many to render!")
+        return iter(self._domain_list)
 
     def __contains__(self, key):
         return key in self._domain_set
@@ -500,15 +508,15 @@ class Census:
     
     def get_domains_in_census(self):
         """Return a list of all domains seen in census."""
-        query = "SELECT public_suffix FROM public_suffix_list"""
+        query = "SELECT public_suffix, prominence FROM public_suffix_list"""
         
         cur = self.connection.cursor()
         cur.itersize = 100000
         cur.execute(query)
         
         domains = []
-        for public_suffix, in cur:
-            domains.append(public_suffix)
+        for public_suffix, prominence in cur:
+            domains.append((public_suffix,prominence))
         return domains
     
     def check_top_url(self, top_url):

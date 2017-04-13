@@ -58,12 +58,12 @@ class URI(object):
             is_el_tracker = utils.is_tracker(self._url, 
                                              is_js=self._is_js,
                                              is_img=self._is_img, 
-                                             first_party=self._first_party._domain, 
+                                             first_party='http://'+self._first_party._domain, 
                                              blocklist='easylist')
             is_ep_tracker = utils.is_tracker(self._url, 
                                              is_js=self._is_js,
                                              is_img=self._is_img, 
-                                             first_party=self._first_party._domain, 
+                                             first_party='http://'+self._first_party._domain, 
                                              blocklist='easyprivacy')
             self._is_tracker = is_el_tracker or is_ep_tracker
         return self._is_tracker
@@ -515,6 +515,7 @@ class Census:
         sites = []
         for top_url, in cur:
             sites.append(top_url[7:])
+        cur.close()
         return sites
     
     def get_domains_in_census(self):
@@ -528,6 +529,7 @@ class Census:
         domains = []
         for public_suffix, prominence in cur:
             domains.append((public_suffix,prominence))
+        cur.close()
         return domains
     
     def check_top_url(self, top_url):
@@ -542,7 +544,7 @@ class Census:
 
         for exists, in cur:
             return exists
-
+        cur.close()
         return False
 
     def check_third_party_domain(self, domain):
@@ -556,7 +558,7 @@ class Census:
 
         for exists, in cur:
             return exists
-
+        cur.close()
         return False        
     
     def get_sites_with_third_party_domain(self, tp_domain):
@@ -638,7 +640,7 @@ class Census:
             url_data['organization_name'] = organization
             
             response_data[url] = url_data
-
+        cur.close()
         return dict(response_data)
 
     def get_third_party_organizations_by_site(self, top_url):
@@ -826,7 +828,8 @@ class Census:
                 else:
                     continue
                 cookie_syncs[receiving_url].add((sending_url, value))
-
+        cookie_cur.close()
+        res_cursor.close()
         return dict(cookie_syncs)
     
     def get_cookie_syncs_for_multiple_sites(self, sites, cookie_length=8, filepath=''):
@@ -947,6 +950,8 @@ class Census:
 
             if len(synced_cookies) > 0 :
                 cookie_syncs[location].add((url, synced_cookie_name, synced_cookie_value))
+        cur.close()
+        cookie_cur.close()
         return dict(cookie_syncs)
 
     def get_urls_with(self, top_url, symbol):
@@ -959,5 +964,5 @@ class Census:
         cur.execute("select top_url, script_url from javascript_view where symbol = %s and top_url = %s",(symbol, top_url))
         for top_url, script_url in cur:
             urls.add(script_url)
-
+        cur.close()
         return urls

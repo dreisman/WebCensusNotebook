@@ -18,6 +18,9 @@ ep_parser = BlockListParser('easyprivacy.txt')
 with open('org_domains.json', 'r') as f:
     org_domains = json.load(f)
 
+with open('alexa_cats.json', 'r') as f:
+    alexa_cats = json.load(f)
+    
 class CensusUtilsException(Exception):
     pass
 
@@ -74,6 +77,11 @@ def get_trackers(url_list, first_party, blocklist_parser=None, blocklist="easyli
             filtered_domains.add(get_domain(url))
 
     return filtered_domains
+
+def get_alexa_categories():
+    """Return a dictionary mapping categories to an ordered list of the top 500 sites in that category."""
+
+    return alexa_cats
 
 def get_org(url):
     """If possible, find the name of the organization owning this particular URL/domain.

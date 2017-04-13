@@ -324,6 +324,7 @@ class FirstPartyDict(collections.MutableMapping):
         self._site_set = set(self._site_list)
         self._alexa_ranks = self.census.get_alexa_rankings()
         self._alexa_list = None
+        self._alexa_cats = utils.get_alexa_categories()
         
     def __getitem__(self, key):
         if 'http:' in key or 'https:' in key:
@@ -360,6 +361,10 @@ class FirstPartyDict(collections.MutableMapping):
         return "<FirstParties on census '" + self.census.census_name + "', indexed by site url>"
     
     @property
+    def alexa_categories(self):
+        return self._alexa_cats
+    
+    @property
     def alexa_ranking(self):
         """Return Alexa rankings in an ordered list."""
         if not self._alexa_list:
@@ -380,8 +385,7 @@ class ThirdPartyDict(collections.MutableMapping):
     def __init__(self, parent_census):
         self.store = dict()
         self.census = parent_census
-        self._domain_list = self.census.get_domains_in_census()
-        self._domain_set = set([x[0] for x in self._domain_list])
+        self._domain_list = sorted(self.census.get_domains_in_census(), key=lambda x : x[1], reverse=True)
         self._prominence = dict()
         for domain, prom in self._domain_list:
             self._prominence[domain] = prom
@@ -405,10 +409,10 @@ class ThirdPartyDict(collections.MutableMapping):
         del self.store[self.__keytransform__(key)]
 
     def __iter__(self):
-        return iter(self._domain_list)
+        return (x[0] for x in self._domain_list)
 
     def __contains__(self, key):
-        return key in self._domain_set
+        return key in self._prominence
     
     def __len__(self):
         # TODO(dillon): Once the table has been materialized, make this do the right check

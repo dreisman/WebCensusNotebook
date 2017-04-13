@@ -2,6 +2,7 @@ from BlockListParser import BlockListParser
 from collections import Counter, defaultdict
 import collections
 import csv
+import itertools
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -321,15 +322,18 @@ class FirstPartyDict(collections.MutableMapping):
         self.store = dict()
         self.census = parent_census
         self._site_list = self.census.get_sites_in_census()
-        self._site_set = set(self._site_list)
         self._alexa_ranks = self.census.get_alexa_rankings()
         self._alexa_list = None
         self._alexa_cats = utils.get_alexa_categories()
         
     def __getitem__(self, key):
+        # If slice, return generator from list in alexa order
+        if isinstance(key, slice):
+            return itertools.islice(self._site_list, key.start, key.stop, key.step)
+        
         if 'http:' in key or 'https:' in key:
             raise CensusException("Exclude scheme (http://|https://) when checking for first party")
-        if key not in self._site_set:
+        if key not in self._alexa_ranks:
             raise CensusException(key + " not in this census dataset")
         try:
             val = self.store[self.__keytransform__(key)]
@@ -349,7 +353,7 @@ class FirstPartyDict(collections.MutableMapping):
         return iter(self._site_list)
 
     def __contains__(self, key):
-        return key in self._site_set
+        return key in self._alexa_ranks
     
     def __len__(self):
         return len(self._site_list)
@@ -391,6 +395,9 @@ class ThirdPartyDict(collections.MutableMapping):
             self._prominence[domain] = prom
         
     def __getitem__(self, key):
+        if isinstance(key, slice):
+            return itertools.islice((x[0] for x in self._domain_list), key.start, key.stop, key.step)
+        
         if 'http:' in key or 'https:' in key:
             raise CensusException("Only specify domain when checking for third party ('example.com')")
         if key not in self:

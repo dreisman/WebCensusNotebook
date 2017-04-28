@@ -338,7 +338,7 @@ class FirstPartyDict(collections.MutableMapping):
     def __getitem__(self, key):
         # If slice, return generator from list in alexa order
         if isinstance(key, slice):
-            return itertools.islice(self._site_list, key.start, key.stop, key.step)
+            return itertools.islice((self[x] for x in self._site_list), key.start, key.stop, key.step)
         
         if 'http:' in key or 'https:' in key:
             raise CensusException("Exclude scheme (http://|https://) when checking for first party")
@@ -359,7 +359,7 @@ class FirstPartyDict(collections.MutableMapping):
         del self.store[self.__keytransform__(key)]
 
     def __iter__(self):
-        return iter(self._site_list)
+        return iter(self[x] for x in self._site_list)
 
     def __contains__(self, key):
         return key in self._alexa_ranks
@@ -405,7 +405,7 @@ class ThirdPartyDict(collections.MutableMapping):
         
     def __getitem__(self, key):
         if isinstance(key, slice):
-            return itertools.islice((x[0] for x in self._domain_list), key.start, key.stop, key.step)
+            return itertools.islice((self[x[0]] for x in self._domain_list), key.start, key.stop, key.step)
         
         if 'http:' in key or 'https:' in key:
             raise CensusException("Only specify domain when checking for third party ('example.com')")
@@ -425,14 +425,13 @@ class ThirdPartyDict(collections.MutableMapping):
         del self.store[self.__keytransform__(key)]
 
     def __iter__(self):
-        return (x[0] for x in self._domain_list)
+        return (self[x[0]] for x in self._domain_list)
 
     def __contains__(self, key):
         return key in self._prominence
     
     def __len__(self):
-        # TODO(dillon): Once the table has been materialized, make this do the right check
-        raise CensusException("Check for number of total ThirdParties not yet implemented")
+        return len(self._domain_list)
 
     def __keytransform__(self, key):
         return key

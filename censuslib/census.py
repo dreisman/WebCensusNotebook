@@ -323,8 +323,15 @@ class FirstPartyDict(collections.MutableMapping):
     To access data for the first party 'example.com', try retrieving
     first_parties['example.com']. That will return a FirstParty object.
     
+    You can also iterate through the first_parties. For instance:
+    cen.first_parties[:50] -> an iterator of the top 50 FirstParties (ordered by Alexa rank).
+    
     Also includes:
     - first_parties.alexa_rankings : An ordered list of Alexa rankings
+    - first_parties.alexa_categories : A dictionary mapping alexa categories
+                                       to the top 500 first parties in those
+                                       categories.
+                                       
     """
     
     def __init__(self, parent_census):
@@ -398,6 +405,9 @@ class ThirdPartyDict(collections.MutableMapping):
     """This object indexes all third party domains that were seen in the census
     To access data from the crawl for the third-party domain 'example.com',
     try third_parties['example.com']. That will return a ThirdParty object.
+    
+    You can also iterate through the third_parties. For instance:
+    cen.third_parties[:50] -> an iterator of the top 50 ThirdParties (ordered by prominence).
     """
     def __init__(self, parent_census):
         self.store = dict()

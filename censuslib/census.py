@@ -308,7 +308,16 @@ class Organization(object):
     
     def __repr__(self):
         return "<Organization : " + self.name + " >"
+    
+    def __eq__(self, other):
+        return other and self.name == other.name
 
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __hash__(self):
+        return hash(self.name)
+    
 class FirstPartyDict(collections.MutableMapping):
     """This object indexes all first parties that were visited in the census.
     To access data for the first party 'example.com', try retrieving

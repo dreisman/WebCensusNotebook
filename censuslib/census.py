@@ -340,6 +340,10 @@ class FirstPartyDict(collections.MutableMapping):
         if isinstance(key, slice):
             return itertools.islice((self[x] for x in self._site_list), key.start, key.stop, key.step)
         
+        # If integer, return FirstParty by alexa rank
+        if isinstance(key, int):
+            return self[self._site_list[key]]
+
         if 'http:' in key or 'https:' in key:
             raise CensusException("Exclude scheme (http://|https://) when checking for first party")
         if key not in self._alexa_ranks:
@@ -406,6 +410,10 @@ class ThirdPartyDict(collections.MutableMapping):
     def __getitem__(self, key):
         if isinstance(key, slice):
             return itertools.islice((self[x[0]] for x in self._domain_list), key.start, key.stop, key.step)
+
+        # If integer, use as index into list of ThirdParty as ordered by prominence
+        if isinstance(key, int):
+            return self[self._domain_list[key][0]]
         
         if 'http:' in key or 'https:' in key:
             raise CensusException("Only specify domain when checking for third party ('example.com')")

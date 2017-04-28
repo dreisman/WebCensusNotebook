@@ -168,16 +168,16 @@ class FirstParty(object):
         
     def _grab_third_parties(self):
         self._third_parties = FirstParty.ThirdPartiesOnFirstPartyDict()
-        self._third_party_resources = dict()
+        self._third_party_resources = []
         results = self.census.get_all_third_party_responses_by_site(self._domain, lazy=True)
         for url in results:
             tp_domain = results[url]['url_domain']
-            self._third_party_resources[url] = URI(url,
+            self._third_party_resources.append(URI(url,
                                                    tp_domain,
                                                    is_js=results[url]['is_js'],
                                                    is_img=results[url]['is_img'],
                                                    first_party=self,
-                                                   parent_census=self.census)
+                                                   parent_census=self.census))
             if tp_domain not in self._third_parties:
                 self._third_parties[tp_domain] = self.census.third_parties[tp_domain]
             
@@ -344,8 +344,12 @@ class Organization(object):
     - Organization.domains : A list of domains the org. controls.
     - Organization.subsidiaries : A list of strings representing owned-subsidiaries
     """
-    def __init__(self, domain):
-        self._details = utils.get_full_organization_details(domain)
+    def __init__(self, domain=None, org_dict=None):
+        if org_dict:
+            self._details = org_dict
+        else:
+            self._details = utils.get_full_organization_details(domain)
+            
         if not self._details:
             raise CensusException("No organization found for : " + domain)
         self._name = self._details['organization']
@@ -535,8 +539,9 @@ class Census:
     """A class representing one census crawl.
     
     To start accessing data, access one of two properties:
-    - Census.first_parties : A dict of first-parties visited in the census crawl, indexed by first-party domain.
-    - Census.third_parties : A dict of third-parties visited in the census crawl, indexed by third-party domain.
+    - Census.first_parties : A dict-like container of first parties visited in the census crawl, indexed by first-party domain.
+    - Census.third_parties : A dict-like container of third parties visited in the census crawl, indexed by third-party domain.
+    - Census.organizations : A dict of known Organizations, indexed by organization name.
     """
     
     def __init__(self, census_name):
@@ -548,6 +553,10 @@ class Census:
         self.connection = psycopg2.connect(db_details)
         self.first_parties = FirstPartyDict(parent_census=self)
         self.third_parties = ThirdPartyDict(parent_census=self)
+        self.organizations = dict()
+        orgs = utils.get_organizations_list()
+        for org in orgs:
+            self.organizations[org['organization']] = Organization(org_dict=org)
     
     def __del__(self):
         self.connection.close()

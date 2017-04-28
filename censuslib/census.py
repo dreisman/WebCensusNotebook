@@ -122,7 +122,7 @@ class FirstParty(object):
     - FirstParty.third_party_resources : A list of URIs belonging to third parties that
                                          were loaded on the FirstParty website.
                                  
-    - FirstParty.third_parties : A dict of the ThirdParty objects of the third parties
+    - FirstParty.third_parties : A container of ThirdParty objects of the third parties
                                  that were loaded.
                                  
     - FirstParty.alexa_rank : The Alexa rank of the FirstParty, at crawl time                             
@@ -134,8 +134,40 @@ class FirstParty(object):
         self._third_party_resources = None
         self._cookie_syncs = None
     
+    class ThirdPartiesOnFirstPartyDict(collections.MutableMapping):
+        """Container of third parties on a particular FirstParty.
+        
+        - Iterating through this object returns the ThirdParty object themselves.
+        - You can check for membership of a ThirdParty on a FirstParty with:
+          'thirdparty.com' in FirstParty.third_parties
+        """
+        def __init__(self, *args, **kwargs):
+            self.store = dict()
+            self.update(dict(*args, **kwargs))  # use the free update to set keys
+
+        def __getitem__(self, key):
+            return self.store[self.__keytransform__(key)]
+
+        def __setitem__(self, key, value):
+            self.store[self.__keytransform__(key)] = value
+
+        def __delitem__(self, key):
+            del self.store[self.__keytransform__(key)]
+
+        def __iter__(self):
+            return iter(self.store.values())
+
+        def __len__(self):
+            return len(self.store)
+        
+        def __keytransform__(self, key):
+            return key
+        
+        def __repr__(self):
+            return list(self.store.values()).__repr__().replace(',', ',\n')
+        
     def _grab_third_parties(self):
-        self._third_parties = dict()
+        self._third_parties = FirstParty.ThirdPartiesOnFirstPartyDict()
         self._third_party_resources = dict()
         results = self.census.get_all_third_party_responses_by_site(self._domain, lazy=True)
         for url in results:
@@ -240,10 +272,42 @@ class ThirdParty(object):
             self._prominence = self.census.third_parties._prominence[self._domain]
         return self._prominence
     
+    class FirstPartiesOnThirdPartyDict(collections.MutableMapping):
+        """Container of first parties on a particular ThirdParty.
+        
+        - Iterating through this object returns the FirstParty object themselves.
+        - You can check for membership of a FirstParty on a ThirdParty with:
+          'first.com' in ThirdParty.first_parties
+        """
+        def __init__(self, *args, **kwargs):
+            self.store = dict()
+            self.update(dict(*args, **kwargs))  # use the free update to set keys
+
+        def __getitem__(self, key):
+            return self.store[self.__keytransform__(key)]
+
+        def __setitem__(self, key, value):
+            self.store[self.__keytransform__(key)] = value
+
+        def __delitem__(self, key):
+            del self.store[self.__keytransform__(key)]
+
+        def __iter__(self):
+            return iter(self.store.values())
+
+        def __len__(self):
+            return len(self.store)
+        
+        def __keytransform__(self, key):
+            return key
+        
+        def __repr__(self):
+            return list(self.store.values()).__repr__().replace(',', ',\n')
+    
     @property
     def first_parties(self):
         if not self._first_parties:
-            self._first_parties = dict()
+            self._first_parties = ThirdParty.FirstPartiesOnThirdPartyDict()
             results = self.census.get_sites_with_third_party_domain(self._domain)
             for fp_url, url in results:
                 fp_domain = fp_url[7:]

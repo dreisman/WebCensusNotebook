@@ -156,6 +156,10 @@ class FirstParty(object):
         return self._third_parties
     
     @property
+    def domain(self):
+        return self._domain
+    
+    @property
     def url(self):
         return 'http://' + self._domain
     

@@ -390,6 +390,45 @@ class Organization(object):
     def __hash__(self):
         return hash(self.name)
     
+class AlexaCategoryDict(collections.MutableMapping):
+    """This object indexes all of the available top FirstParties for each Alexa category.
+    
+    For example:
+    cen.first_parties.alexa_cats['news'] -> An ordered list of FirstParty objects
+    """
+    def __init__(self, parent_census, alexa_cats):
+        self.store = dict()
+        self.update(dict())  # use the free update to set keys
+        self.census = parent_census
+        self._alexa_cats = alexa_cats
+        for key in self._alexa_cats:
+            self.store[self.__keytransform__(key)] = None
+        
+    def __getitem__(self, key):
+        if not self.store[self.__keytransform__(key)]:
+            list_of_sites = self._alexa_cats[key]
+            self[self.__keytransform__(key)] = []
+            for site in list_of_sites:
+                if site in self.census.first_parties:
+                    self.store[self.__keytransform__(key)].append(self.census.first_parties[site])
+            
+        return self.store[self.__keytransform__(key)]
+
+    def __setitem__(self, key, value):
+        self.store[self.__keytransform__(key)] = value
+
+    def __delitem__(self, key):
+        del self.store[self.__keytransform__(key)]
+
+    def __iter__(self):
+        return iter(self.store)
+
+    def __len__(self):
+        return len(self.store)
+
+    def __keytransform__(self, key):
+        return key
+    
 class FirstPartyDict(collections.MutableMapping):
     """This object indexes all first parties that were visited in the census.
     To access data for the first party 'example.com', try retrieving
@@ -413,7 +452,9 @@ class FirstPartyDict(collections.MutableMapping):
         self._alexa_ranks = self.census.get_alexa_rankings()
         self._alexa_list = None
         self._alexa_cats = utils.get_alexa_categories()
-        
+        self._alexa_cats_fps = AlexaCategoryDict(parent_census, self._alexa_cats)
+
+            
     def __getitem__(self, key):
         # If slice, return generator from list in alexa order
         if isinstance(key, slice):
@@ -458,7 +499,12 @@ class FirstPartyDict(collections.MutableMapping):
     
     @property
     def alexa_categories(self):
-        return self._alexa_cats
+        """This object indexes all of the available top FirstParties for each Alexa category.
+
+        For example:
+        cen.first_parties.alexa_cats['news'] -> An ordered list of FirstParty objects
+        """
+        return self._alexa_cats_fps
     
     @property
     def alexa_ranking(self):
@@ -473,6 +519,8 @@ class FirstPartyDict(collections.MutableMapping):
         print("To access data for the first party 'example.com', try retrieving first_parties['example.com'].")
         print("That will return a FirstParty object.")
 
+
+    
 class ThirdPartyDict(collections.MutableMapping):
     """This object indexes all third party domains that were seen in the census
     To access data from the crawl for the third-party domain 'example.com',

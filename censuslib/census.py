@@ -449,7 +449,9 @@ class FirstPartyDict(collections.MutableMapping):
         self.store = dict()
         self.census = parent_census
         self._site_list = self.census.get_sites_in_census()
-        self._alexa_ranks = self.census.get_alexa_rankings()
+        self._alexa_ranks = dict()
+        for i, site in enumerate(self._site_list):
+            self._alexa_ranks[site] = i + 1
         self._alexa_list = None
         self._alexa_cats = utils.get_alexa_categories()
         self._alexa_cats_fps = AlexaCategoryDict(parent_census, self._alexa_cats)
@@ -460,7 +462,7 @@ class FirstPartyDict(collections.MutableMapping):
         if isinstance(key, slice):
             return itertools.islice((self[x] for x in self._site_list), key.start, key.stop, key.step)
         
-        # If integer, return FirstParty by alexa rank
+        # If integer, return FirstParty by index order
         if isinstance(key, int):
             return self[self._site_list[key]]
 
@@ -593,12 +595,13 @@ class Census:
     """
     
     def __init__(self, census_name):
-        user = 'openwpm'
-        password = 'Pwcpdtwca!'
-        host = 'princeton-web-census-machine-1.cp85stjatkdd.us-east-1.rds.amazonaws.com' 
-        db_details = 'dbname={0} user={1} password={2} host={3}'.format(census_name, user, password, host)
+        self._user = 'openwpm'
+        self._password = 'Pwcpdtwca!'
+        self._host = 'princeton-web-census-machine-1.cp85stjatkdd.us-east-1.rds.amazonaws.com' 
+        self._db_details = 'dbname={0} user={1} password={2} host={3}'.format(census_name, self._user, self._password, self._host)
         self.census_name = census_name
-        self.connection = psycopg2.connect(db_details)
+        self.connection = psycopg2.connect(self._db_details)
+        self.connection.set_session(readonly=True, autocommit=True)
         self.first_parties = FirstPartyDict(parent_census=self)
         self.third_parties = ThirdPartyDict(parent_census=self)
         self.organizations = dict()
@@ -641,14 +644,22 @@ class Census:
         
         return present_sites
     
-    def get_alexa_rankings(self):
-        """Retrieve Alexa rankings used in census as a dict mapping urls to rank."""
+    def _get_alexa_rankings(self):
+        """Retrieve Alexa rankings used in census as a dict mapping urls to rank.
+        NOTE: DEPRECATED.
+        """
         query = "SELECT rank, top_url FROM alexa_rank"
         
         cur = self.connection.cursor()
         cur.itersize = 100000
-        cur.execute(query)
-        
+        try:
+            cur.execute(query)
+        except:
+            self._reconnect()
+            cur = self.connection.cursor()
+            cur.itersize = 100000
+            cur.execute(query)
+            
         rankings = dict()
         for rank, top_url in cur:
             rankings[top_url] = rank
@@ -661,8 +672,14 @@ class Census:
         
         cur = self.connection.cursor()
         cur.itersize = 100000
-        cur.execute(query)
-        
+        try:
+            cur.execute(query)
+        except:
+            self._reconnect()
+            cur = self.connection.cursor()
+            cur.itersize = 100000   
+            cur.execute(query)
+            
         sites = []
         for top_url, in cur:
             sites.append(top_url[7:])
@@ -675,8 +692,14 @@ class Census:
         
         cur = self.connection.cursor()
         cur.itersize = 100000
-        cur.execute(query)
-        
+        try:
+            cur.execute(query)
+        except:
+            self._reconnect()    
+            cur = self.connection.cursor()
+            cur.itersize = 100000  
+            cur.execute(query)
+            
         domains = []
         for public_suffix, prominence in cur:
             domains.append((public_suffix,prominence))
@@ -690,9 +713,14 @@ class Census:
 
         cur = self.connection.cursor()
         cur.itersize = 1
-
-        cur.execute(check_query, (top_url,))
-
+        try:
+            cur.execute(check_query, (top_url,))
+        except:
+            self._reconnect()
+            cur = self.connection.cursor()
+            cur.itersize = 1
+            cur.execute(check_query, (top_url,))
+            
         for exists, in cur:
             return exists
         cur.close()
@@ -704,9 +732,14 @@ class Census:
 
         cur = self.connection.cursor()
         cur.itersize = 1
-
-        cur.execute(check_query, (domain,))
-
+        try:
+            cur.execute(check_query, (domain,))
+        except:
+            self._reconnect()
+            cur = self.connection.cursor()
+            cur.itersize = 1
+            cur.execute(check_query, (domain,))
+            
         for exists, in cur:
             return exists
         cur.close()
@@ -727,11 +760,19 @@ class Census:
                    "FROM response_domains LEFT JOIN public_suffix_list " \
                    "ON response_domains.ps_id = public_suffix_list.id  " \
                    "WHERE public_suffix_list.public_suffix = %s;"
-        cur = self.connection.cursor('tp-cursor')
+        cur = self.connection.cursor()#'tp-cursor')
         cur.itersize = 100000
 
-        cur.execute(tp_query, (tp_domain,))
-
+        try:
+            cur = self.connection.cursor()#'tp-cursor')
+            cur.itersize = 100000
+            cur.execute(tp_query, (tp_domain,))
+        except:
+            self._reconnect()
+            cur = self.connection.cursor()#'tp-cursor')
+            cur.itersize = 100000
+            cur.execute(tp_query, (tp_domain,))
+            
         sites_with_tp = []
         for top_url, url in cur:
             sites_with_tp.append((top_url, url))
@@ -746,16 +787,26 @@ class Census:
                    "LEFT JOIN http_response_headers_view as h ON h.response_id = r.id " \
                    " WHERE r.top_url LIKE %s AND " \
                    "url not LIKE %s and h.name = 'Content-Type'"
-        cur = self.connection.cursor()
-        cur.itersize = 100000
+
         try:
             top_ps = utils.get_domain(top_url)
         except AttributeError:
             print("Error while finding public suffix of %s" % top_url)
             return None
+        cur = self.connection.cursor()
+        cur.itersize = 100000
+        try:
+            cur.execute(tp_query, (top_url, top_ps))
+        except:
+            self._reconnect()
+            cur = self.connection.cursor()
+            cur.itersize = 100000
+            cur.execute(tp_query, (top_url, top_ps))
 
-        cur.execute(tp_query, (top_url, top_ps))
-
+        # If no responses, then clearly this was a crawl failure. Raise exception
+        #if cur.rowcount <= 0:
+        #    raise CensusException("No responses found: Census crawl failed to ")
+        
         response_data = defaultdict(dict)
         for url, content_type in cur:
             if utils.should_ignore(url):
@@ -1117,3 +1168,8 @@ class Census:
             urls.add(script_url)
         cur.close()
         return urls
+    
+    def _reconnect(self):
+        """If connection to PostGre was lost, reconnect."""
+        self.connection = psycopg2.connect(self._db_details)
+        self.connection.set_session(readonly=True, autocommit=True)

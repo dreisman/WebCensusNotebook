@@ -446,8 +446,7 @@ class FirstPartyDict(collections.MutableMapping):
     Also includes:
     - first_parties.alexa_rankings : An ordered list of Alexa rankings
     - first_parties.alexa_categories : A dictionary mapping alexa categories
-                                       to the top 500 first parties in those
-                                       categories.
+                                       to a set of the top sites for that category.
                                        
     """
     
@@ -461,7 +460,11 @@ class FirstPartyDict(collections.MutableMapping):
         self._site_list = [x[0] for x in self._all_sites if x[1]]
         self._failed_sites = set(x[0] for x in self._all_sites if not x[1])
         self._alexa_list = None
-        self._alexa_cats = utils.get_alexa_categories()
+        alexa_cats = utils.get_alexa_categories()
+        self._alexa_cats = dict()
+        for cat in alexa_cats:
+            self._alexa_cats[cat] = set(fp for fp in alexa_cats[cat]
+                                        if fp in self._alexa_ranks and fp not in self._failed_sites)
         self._alexa_cats_fps = AlexaCategoryDict(parent_census, self._alexa_cats)
 
             
@@ -499,7 +502,7 @@ class FirstPartyDict(collections.MutableMapping):
         return iter(self[x] for x in self._site_list)
 
     def __contains__(self, key):
-        return key in self._alexa_ranks and key not in self._failed_sites
+        return key in self._alexa_ranks
     
     def __len__(self):
         return len(self._site_list)

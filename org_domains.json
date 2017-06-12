@@ -319,6 +319,7 @@
       "amazon-adsystem.com",
       "amazon.com",
       "amazonaws.com",
+      "s3.amazonaws.com",
       "cloudfront.net",
       "images-amazon.com",
       "ssl-images-amazon.com"
@@ -1359,6 +1360,9 @@
       "googleadservices.com",
       "googleadsserving.cn",
       "googleapis.com",
+      "fonts.googleapis.com",
+      "ajax.googleapis.com",
+      "maps.googleapis.com",
       "googleapps.com",
       "googlebot.com",
       "googlecommerce.com",

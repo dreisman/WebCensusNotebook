@@ -350,8 +350,14 @@ class Organization(object):
         else:
             self._details = utils.get_full_organization_details(domain)
             
+        # If no organization found, provide a dummy organization object for the domain
         if not self._details:
-            raise CensusException("No organization found for : " + domain)
+            self._details = dict()
+            self._details['organization'] = domain
+            self._details['notes'] = "[No known organization found for domain]"
+            self._details['domains'] = [domain]
+            self._details['subsidiaries'] = []
+            
         self._name = self._details['organization']
         self._notes = self._details['notes']
         self._domains = self._details['domains']
@@ -448,10 +454,12 @@ class FirstPartyDict(collections.MutableMapping):
     def __init__(self, parent_census):
         self.store = dict()
         self.census = parent_census
-        self._site_list = self.census.get_sites_in_census()
+        self._all_sites = self.census.get_sites_in_census()
         self._alexa_ranks = dict()
-        for i, site in enumerate(self._site_list):
-            self._alexa_ranks[site] = i + 1
+        for i, site in enumerate(self._all_sites):
+            self._alexa_ranks[site[0]] = i + 1
+        self._site_list = [x[0] for x in self._all_sites if x[1]]
+        self._failed_sites = set(x[0] for x in self._all_sites if not x[1])
         self._alexa_list = None
         self._alexa_cats = utils.get_alexa_categories()
         self._alexa_cats_fps = AlexaCategoryDict(parent_census, self._alexa_cats)
@@ -470,6 +478,9 @@ class FirstPartyDict(collections.MutableMapping):
             raise CensusException("Exclude scheme (http://|https://) when checking for first party")
         if key not in self._alexa_ranks:
             raise CensusException(key + " not in this census dataset")
+        if key in self._failed_sites:
+            raise CensusException("Data unavailable for " + key + " due to crawl error")
+            
         try:
             val = self.store[self.__keytransform__(key)]
         except KeyError:
@@ -488,7 +499,7 @@ class FirstPartyDict(collections.MutableMapping):
         return iter(self[x] for x in self._site_list)
 
     def __contains__(self, key):
-        return key in self._alexa_ranks
+        return key in self._alexa_ranks and key not in self._failed_sites
     
     def __len__(self):
         return len(self._site_list)
@@ -668,7 +679,7 @@ class Census:
     
     def get_sites_in_census(self):
         """Return a list of top_urls in census."""
-        query = "SELECT top_url FROM site_visits"
+        query = "SELECT top_url, crawl_success FROM site_visits"
         
         cur = self.connection.cursor()
         cur.itersize = 100000
@@ -681,8 +692,8 @@ class Census:
             cur.execute(query)
             
         sites = []
-        for top_url, in cur:
-            sites.append(top_url[7:])
+        for top_url, crawl_success in cur:
+            sites.append((top_url[7:], crawl_success))
         cur.close()
         return sites
     

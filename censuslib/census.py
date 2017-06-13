@@ -397,10 +397,12 @@ class Organization(object):
         return hash(self.name)
     
 class AlexaCategoryDict(collections.MutableMapping):
-    """This object indexes all of the available top FirstParties for each Alexa category.
+    """This object maps Alexa category names to a set of FirstParty objects belonging to those
+    categories found in this crawl.
     
     For example:
-    cen.first_parties.alexa_cats['news'] -> An ordered list of FirstParty objects
+    cen.first_parties.alexa_cats['news'] -> A set of FirstParty objects that Alexa has
+        identified in the "News" category
     """
     def __init__(self, parent_census, alexa_cats):
         self.store = dict()

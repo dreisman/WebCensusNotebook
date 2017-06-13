@@ -397,12 +397,10 @@ class Organization(object):
         return hash(self.name)
     
 class AlexaCategoryDict(collections.MutableMapping):
-    """This object maps Alexa category names to a set of FirstParty objects belonging to those
-    categories found in this crawl.
+    """This object indexes all of the available top FirstParties for each Alexa category.
     
     For example:
-    cen.first_parties.alexa_cats['news'] -> A set of FirstParty objects that Alexa has
-        identified in the "News" category
+    cen.first_parties.alexa_cats['news'] -> An ordered list of FirstParty objects
     """
     def __init__(self, parent_census, alexa_cats):
         self.store = dict()
@@ -443,10 +441,15 @@ class FirstPartyDict(collections.MutableMapping):
     first_parties['example.com']. That will return a FirstParty object.
     
     You can also iterate through the first_parties. For instance:
-    cen.first_parties[:50] -> an iterator of the top 50 FirstParties (ordered by Alexa rank).
+    cen.first_parties[:50] -> an iterator of the top 50 FirstParties ordered by Alexa rank.
+        NOTE: Slicing and indexing only return sites for which the crawler didn't fail.
+              Therefore, getting cen.first_parties[N] does not strictly return the Nth most
+              popular Alexa site.
     
     Also includes:
-    - first_parties.alexa_rankings : An ordered list of Alexa rankings
+    - first_parties.alexa_rankings : A list of FirstParties ordered by Alexa Rank.
+         (If a given site failed during the crawl, iterating through this list may
+          return an error for that site.
     - first_parties.alexa_categories : A dictionary mapping alexa categories
                                        to a set of the top sites for that category.
                                        
@@ -457,10 +460,10 @@ class FirstPartyDict(collections.MutableMapping):
         self.census = parent_census
         self._all_sites = self.census.get_sites_in_census()
         self._alexa_ranks = dict()
-        for i, site in enumerate(self._all_sites):
-            self._alexa_ranks[site[0]] = i + 1
-        self._site_list = [x[0] for x in self._all_sites if x[1]]
-        self._failed_sites = set(x[0] for x in self._all_sites if not x[1])
+        for site in self._all_sites:
+            self._alexa_ranks[site[1]] = site[0]
+        self._site_list = [x[1] for x in self._all_sites if x[2]]
+        self._failed_sites = set(x[1] for x in self._all_sites if not x[2])
         self._alexa_list = None
         alexa_cats = utils.get_alexa_categories()
         self._alexa_cats = dict()
@@ -471,7 +474,7 @@ class FirstPartyDict(collections.MutableMapping):
 
             
     def __getitem__(self, key):
-        # If slice, return generator from list in alexa order
+        # If slice, return generator from list of top sites for which we have data
         if isinstance(key, slice):
             return itertools.islice((self[x] for x in self._site_list), key.start, key.stop, key.step)
         
@@ -524,11 +527,62 @@ class FirstPartyDict(collections.MutableMapping):
         """
         return self._alexa_cats_fps
     
+    class AlexaRankingList(collections.MutableMapping):
+        """FirstParties in crawl ordered strictly by Alexa ranking.
+        
+        Due to crawl failures, iterating through this list or accessing individual
+        members might throw an exception that needs to be handled.
+        
+        Iterating through this object returns the FirstParty object themselves.
+        """
+        def __init__(self, parent_census, alexa_list):
+            self._census = parent_census
+            self._alexa_list = alexa_list
+            self.store = dict()
+
+        def __getitem__(self, key):
+            # If slice, return generator from list in alexa order
+            if isinstance(key, slice):
+                return itertools.islice((self._census.first_parties[x] for x in self._alexa_list),
+                                        key.start, key.stop, key.step)
+
+            # If integer, return FirstParty by Alexa rank
+            if isinstance(key, int):
+                return self._census.first_parties[self._alexa_list[key-1][0]]
+
+            raise CensusException("FirstParties in alexa_rankings only accessible via index/slicing")
+            
+        def __setitem__(self, key, value):
+            self.store[self.__keytransform__(key)] = value
+
+        def __delitem__(self, key):
+            del self.store[self.__keytransform__(key)]
+
+        def __iter__(self):
+            return iter(self._census.first_parties[x] for x in self._alexa_list)
+
+        def __len__(self):
+            return len(self._alexa_list)
+        
+        def __keytransform__(self, key):
+            return key
+        
+        def __repr__(self):
+            return "<FirstParties by Alexa Ranking>"
+        
     @property
     def alexa_ranking(self):
-        """Return Alexa rankings in an ordered list."""
+        """FirstParties in crawl ordered strictly by Alexa ranking.
+        
+        Due to crawl failures, iterating through this list or accessing individual
+        members might throw an exception that needs to be handled.
+        
+        Iterating through this object returns the FirstParty object themselves.
+        """
         if not self._alexa_list:
-            self._alexa_list = sorted(list(self._alexa_ranks.items()), key = lambda x : x[1])
+            sorted_alexa = sorted(list(self._alexa_ranks.items()), key = lambda x : x[1])
+            self._alexa_list = FirstPartyDict.AlexaRankingList(self.census, sorted_alexa)
+
         return self._alexa_list
     
     @property
@@ -684,7 +738,7 @@ class Census:
     
     def get_sites_in_census(self):
         """Return a list of top_urls in census."""
-        query = "SELECT top_url, crawl_success FROM site_visits"
+        query = "SELECT id, top_url, crawl_success FROM site_visits"
         
         cur = self.connection.cursor()
         cur.itersize = 100000
@@ -697,10 +751,10 @@ class Census:
             cur.execute(query)
             
         sites = []
-        for top_url, crawl_success in cur:
-            sites.append((top_url[7:], crawl_success))
+        for vid, top_url, crawl_success in cur:
+            sites.append((vid, top_url[7:], crawl_success))
         cur.close()
-        return sites
+        return sorted(sites, key=lambda x: x[0])
     
     def get_domains_in_census(self):
         """Return a list of all domains seen in census."""

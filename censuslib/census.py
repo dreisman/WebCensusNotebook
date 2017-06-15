@@ -459,17 +459,16 @@ class FirstPartyDict(collections.MutableMapping):
         self.store = dict()
         self.census = parent_census
         self._all_sites = self.census.get_sites_in_census()
-        self._alexa_ranks = dict()
-        for site in self._all_sites:
-            self._alexa_ranks[site[1]] = site[0]
+        self._alexa_ranks = self.census.get_alexa_rankings()
         self._site_list = [x[1] for x in self._all_sites if x[2]]
+        self._site_set = set(self._site_list)
         self._failed_sites = set(x[1] for x in self._all_sites if not x[2])
         self._alexa_list = None
         alexa_cats = utils.get_alexa_categories()
         self._alexa_cats = dict()
         for cat in alexa_cats:
             self._alexa_cats[cat] = set(fp for fp in alexa_cats[cat]
-                                        if fp in self._alexa_ranks and fp not in self._failed_sites)
+                                        if fp in self._site_set)
         self._alexa_cats_fps = AlexaCategoryDict(parent_census, self._alexa_cats)
 
             
@@ -484,7 +483,7 @@ class FirstPartyDict(collections.MutableMapping):
 
         if 'http:' in key or 'https:' in key:
             raise CensusException("Exclude scheme (http://|https://) when checking for first party")
-        if key not in self._alexa_ranks:
+        if key not in self._site_set and key not in self._failed_sites:
             raise CensusException(key + " not in this census dataset")
         if key in self._failed_sites:
             raise CensusException("Data unavailable for " + key + " due to crawl error")
@@ -507,7 +506,7 @@ class FirstPartyDict(collections.MutableMapping):
         return iter(self[x] for x in self._site_list)
 
     def __contains__(self, key):
-        return key in self._alexa_ranks
+        return key in self._site_set 
     
     def __len__(self):
         return len(self._site_list)
@@ -543,7 +542,7 @@ class FirstPartyDict(collections.MutableMapping):
         def __getitem__(self, key):
             # If slice, return generator from list in alexa order
             if isinstance(key, slice):
-                return itertools.islice((self._census.first_parties[x] for x in self._alexa_list),
+                return itertools.islice((self._census.first_parties[x[0]] for x in self._alexa_list),
                                         key.start, key.stop, key.step)
 
             # If integer, return FirstParty by Alexa rank
@@ -714,9 +713,8 @@ class Census:
         
         return present_sites
     
-    def _get_alexa_rankings(self):
+    def get_alexa_rankings(self):
         """Retrieve Alexa rankings used in census as a dict mapping urls to rank.
-        NOTE: DEPRECATED.
         """
         query = "SELECT rank, top_url FROM alexa_rank"
         

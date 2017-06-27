@@ -13,6 +13,42 @@ import utils
 class CensusException(Exception):
     pass
 
+class Cookie(object):
+    """A Cookie object represents all instances of a particular (domain, name) in a crawl.
+    
+    Available properties:
+    - Cookie.domain : The domain owning this cookie
+    - Cookie.name : The name of the cookie
+    - Cookie.secure : Is the cookie marked 'secure'?
+    - Cookie.httponly : Is the cookie an HTTP-only cookie?
+    
+    """
+    def __init__(self, domain, name, instances):
+        self._domain = domain
+        self._name = name
+        self._secure = any([x[1] for x in instances])
+        self._httponly = any([x[2] for x in instances])
+        self._instances = instances
+    
+    @property
+    def domain(self):
+        return self._domain
+
+    @property
+    def name(self):
+        return self._name
+    
+    @property
+    def secure(self):
+        return self._secure
+    
+    @property
+    def sample_value(self):
+        return self._instances[0][0]
+    
+    def __repr__(self):
+        return "<Cookie name: " + self._name + ", owned by domain '" + self._domain + "'>"
+    
 class URI(object):
     """A URI object represents a single instance of a resource embedded on a FirstParty.
     
@@ -133,6 +169,7 @@ class FirstParty(object):
         self._third_parties = None
         self._third_party_resources = None
         self._cookie_syncs = None
+        self._cookies = None
     
     class ThirdPartiesOnFirstPartyDict(collections.MutableMapping):
         """Container of third parties on a particular FirstParty.
@@ -206,6 +243,15 @@ class FirstParty(object):
         return self._third_party_resources
     
     @property
+    def cookies(self):
+        if not self._cookies:
+            cookies_dict = self.census.get_cookies_by_domain(self._domain)
+            cookies = []
+            for name in cookies_dict:
+                cookies.append(Cookie(self._domain, name, cookies_dict[name]))
+        return cookies
+    
+    @property
     def cookie_syncs(self):
         # TODO(dillon): Add cookie syncing logic to FirstParty
         raise CensusException("Cookie syncing not yet implemented!")
@@ -250,6 +296,7 @@ class ThirdParty(object):
         self._first_parties = None
         self._all_resources = None
         self._prominence = None
+        self._cookies = None
         
     @property
     def all_resources(self):
@@ -320,6 +367,15 @@ class ThirdParty(object):
         if not self._organization:
             self._organization = Organization(self._domain)
         return self._organization
+    
+    @property
+    def cookies(self):
+        if not self._cookies:
+            cookies_dict = self.census.get_cookies_by_domain(self._domain)
+            cookies = []
+            for name in cookies_dict:
+                cookies.append(Cookie(self._domain, name, cookies_dict[name]))
+        return cookies
     
     @organization.setter
     def organization(self, val):
@@ -1021,6 +1077,31 @@ class Census:
         third_party_scripts = [x for x in results if results[x]['is_js']]
         
         return third_party_scripts
+    
+    def get_cookies_by_domain(self, domain):
+        """Return a list of cookies set by this domain.
+        
+        NOTE: Currently only uses http response cookies. Cookies set by javascript
+              not included.
+        """
+        query = "SELECT name, value, secure, httponly, domain FROM " \
+                "http_response_cookies_view WHERE domain_ps = %s"
+        
+        cur = self.connection.cursor()
+        cur.itersize = 100000
+        try:
+            cur.execute(query, (domain,))
+        except:
+            self._reconnect()    
+            cur = self.connection.cursor()
+            cur.itersize = 100000  
+            cur.execute(query, (domain,))
+            
+        cookies = defaultdict(list)
+        for name, value, secure, httponly, domain in cur:
+            cookies[name].append((value, secure, httponly, domain))
+        cur.close()
+        return dict(cookies)        
     
     def get_cookie_syncs_by_site(self, top_url, cookie_length=8):
         """Get all 'cookie sync' events on a given top_url.

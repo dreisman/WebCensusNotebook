@@ -169,6 +169,8 @@ class FirstParty(object):
     - FirstParty.alexa_rank : The Alexa rank of the FirstParty, at crawl time    
     
     - FirstParty.https : Was the site loaded via HTTPS?
+    
+    - FirstParty.summary_report : A summary of facts about this FirstParty.
     """
     def __init__(self, fp_domain, parent_census):
         self._domain = fp_domain
@@ -266,6 +268,25 @@ class FirstParty(object):
         return cookies
     
     @property
+    def summary_report(self):
+        rep_chunks = []
+        rep_chunks.append("++++++  Report for first party: {} ++++++".format(self._domain))
+        rep_chunks.append("Alexa rank: {} ".format(self.alexa_rank))
+        rep_chunks.append("Was the site loaded via HTTPS?: {}".format('Yes' if self.https else 'No'))
+        rep_chunks.append("Number of third party resources on landing page: {}".format(len(self.third_party_resources)))
+        rep_chunks.append("Number of third party trackers on landing page: {}".format(
+            len([uri for uri in self.third_party_resources if uri.is_tracker])))
+        rep_chunks.append("Number of distinct third parties on landing page: {}".format(len(self.third_parties)))
+        rep_chunks.append("List of third party domains:")
+        for tp in self.third_parties:
+            rep_chunks.append("\t{}".format(tp))
+        
+        rep_chunks.append("Browse historic versions at archive.org: http://web.archive.org/web/*/{}".format(self._domain))
+        report = "\n".join(rep_chunks)
+        print(report)
+        return report
+    
+    @property
     def cookie_syncs(self):
         # TODO(dillon): Add cookie syncing logic to FirstParty
         raise CensusException("Cookie syncing not yet implemented!")
@@ -301,7 +322,12 @@ class ThirdParty(object):
     - ThirdParty.domain : The ThirdParty's domain.
     
     - ThirdParty.organization : The Organization owning this ThirdParty (raises exception if
-                                no organization identified).           
+                                no organization identified).
+    
+    - ThirdParty.cookies : A list of Cookies set by this ThirdParty
+    
+    - ThirdParty.summary_report : A summary of facts about this ThirdParty
+                                
     """
     def __init__(self, domain, parent_census):
         self._domain = domain
@@ -389,12 +415,26 @@ class ThirdParty(object):
             cookies = []
             for name in cookies_dict:
                 cookies.append(Cookie(self._domain, name, cookies_dict[name]))
-        return cookies
+            self._cookies = cookies
+        return self._cookies
     
     @organization.setter
     def organization(self, val):
         self._organization = val
-        
+
+    @property
+    def summary_report(self):
+        rep_chunks = []
+        rep_chunks.append("++++++  Report for third party: {} ++++++".format(self._domain))
+        rep_chunks.append("Prominence: {} ".format(self.prominence))
+        rep_chunks.append("Organization: {}".format(self.organization))
+        rep_chunks.append("First parties that have this third party embedded: {}".format(len(self.first_parties)))
+        rep_chunks.append("Number of cookies set: {}".format(len(self.cookies)))
+        rep_chunks.append("See more cookie info at: http://cookiepedia.co.uk/host/{}".format(self._domain))
+        report = "\n".join(rep_chunks)
+        print(report)
+        return report
+    
     @property
     def help(self):
         print("Available properties of " + str(type(self)) + ":")

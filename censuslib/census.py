@@ -43,8 +43,13 @@ class Cookie(object):
         return self._secure
     
     @property
+    def httponly(self):
+        return self._httponly
+    
+    @property
     def sample_value(self):
         return self._instances[0][0]
+    
     
     def __repr__(self):
         return "<Cookie name: " + self._name + ", owned by domain '" + self._domain + "'>"
@@ -161,7 +166,9 @@ class FirstParty(object):
     - FirstParty.third_parties : A container of ThirdParty objects of the third parties
                                  that were loaded.
                                  
-    - FirstParty.alexa_rank : The Alexa rank of the FirstParty, at crawl time                             
+    - FirstParty.alexa_rank : The Alexa rank of the FirstParty, at crawl time    
+    
+    - FirstParty.https : Was the site loaded via HTTPS?
     """
     def __init__(self, fp_domain, parent_census):
         self._domain = fp_domain
@@ -170,6 +177,7 @@ class FirstParty(object):
         self._third_party_resources = None
         self._cookie_syncs = None
         self._cookies = None
+        self._https = None
     
     class ThirdPartiesOnFirstPartyDict(collections.MutableMapping):
         """Container of third parties on a particular FirstParty.
@@ -235,7 +243,13 @@ class FirstParty(object):
     @property
     def alexa_rank(self):
         return self.census.first_parties._alexa_ranks[self._domain]
-        
+    
+    @property
+    def https(self):
+        if not self._https:
+            self._https = self.census.is_site_https(self._domain)
+        return self._https
+    
     @property
     def third_party_resources(self):
         if self._third_party_resources == None:
@@ -868,6 +882,38 @@ class Census:
             return exists
         cur.close()
         return False        
+    
+    def is_site_https(self, top_url):
+        """Return true if a site was loaded using HTTPS"""
+        top_url = 'http://' + top_url        
+        try:
+            top_ps = utils.get_domain(top_url)
+        except AttributeError:
+            print("Error while finding public suffix of %s" % top_url)
+            return None
+        
+        https_query = "SELECT url, location FROM http_responses_view WHERE top_url = %s LIMIT 2"
+
+        cur = self.connection.cursor()
+        cur.itersize = 2
+        try:
+            cur.execute(https_query, (top_url,))
+        except:
+            self._reconnect()
+            cur = self.connection.cursor()
+            cur.itersize = 2
+            cur.execute(https_query, (top_url,))
+        
+        is_https = False
+        for url, location in cur:
+            if location:
+                location_ps = utils.get_domain(location)
+                if location_ps == top_ps and location[:5] == 'https':
+                    is_https = True
+                    
+        cur.close()
+        
+        return is_https
     
     def get_sites_with_third_party_domain(self, tp_domain):
         """Return a list of tuples representing first_parties that have a particular embedded third party.

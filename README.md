@@ -13,16 +13,15 @@ Any methods called in `demo.ipynb` that save their output will write their outpu
 * For every ThirdParty, get each FirstParty it is embedded on and the URLs of the ThirdParty's resources.
 * Tracker status for a given resource.
 * Analysis by Alexa category.
+* Get cookies set by a particular ThirdParty (v1)
 
 ## Upcoming features:
 * Get cookie sync events on each FirstParty
-* Get all cookies set by a particular ThirdParty
 * Check for third party fingerprinting
 
 ## Current available data:
 * One million sites, October 2016
+* One million sites, January 2016
 
 ## Data coming soon:
-* One million sites, January 2016
-* One million sites, January 2017
-* One million sites, May 2017
+* One million sites, April 2017
